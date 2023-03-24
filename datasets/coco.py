@@ -836,7 +836,6 @@ def build(image_set, args):
             return_masks=args.masks,
             image_set=image_set,
             aux_target_hacks=aux_target_hacks_list,
-            num_imgs=20000
         )
     dataset.get_class_id_to_img_id()
     print(dataset.class_dict.keys())
