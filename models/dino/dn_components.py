@@ -70,21 +70,18 @@ def prepare_for_sample_dn(dn_args, training, num_queries, hidden_dim, query_labe
         boxes = torch.cat([t['boxes'] for t in targets])
 
         batch_idx = torch.cat([torch.full_like(t['labels'].long(), i) for i, t in enumerate(targets)])
-        query_list = []
-        for batch in batch_idx:
-            # print('label:', query_label[batch][random.randint(0, num_queries-1)])
-            query_list.append(query_label[batch][random.randint(0, num_queries-1)][None, :])
-        label_dn = torch.cat(query_list, dim=0)
-        # print('batch_idx', batch_idx.shape)
-        # print('label_dn', label_dn.shape)
+        
+        query_idx = torch.randint(0, num_queries, (batch_idx.shape[0],)).to(batch_idx)
+        label_dn = query_label[batch_idx, query_idx, :] # num_targets x C
+
         known_indice = torch.nonzero(unmask_label + unmask_bbox)
         known_indice = known_indice.view(-1)
 
-        known_indice = known_indice.repeat(2 * dn_number, 1).view(-1)
-        input_label_embed = label_dn.repeat(2 * dn_number, 1)
+        known_indice = known_indice.repeat(2 * dn_number, 1).view(-1) # 2* dn_number * num_target
+        input_label_embed = label_dn.repeat(2 * dn_number, 1) # 2* dn_number * num_target x C
         # print('input_label_embed', input_label_embed.shape)
-        known_bid = batch_idx.repeat(2 * dn_number, 1).view(-1)
-        known_bboxs = boxes.repeat(2 * dn_number, 1)
+        known_bid = batch_idx.repeat(2 * dn_number, 1).view(-1) # 2* dn_number * num_target
+        known_bboxs = boxes.repeat(2 * dn_number, 1) # 2* dn_number * num_target x 4
         # known_labels_expaned = known_labels.clone()
         known_bbox_expand = known_bboxs.clone()
 
@@ -134,7 +131,7 @@ def prepare_for_sample_dn(dn_args, training, num_queries, hidden_dim, query_labe
             input_query_bbox[(known_bid.long(), map_known_indice)] = input_bbox_embed
             # print('input_query_label', input_query_label)
             # print('input_query_bbox', input_query_bbox)
-
+        # import pdb; pdb.set_trace()
         tgt_size = pad_size + num_queries
         attn_mask = torch.ones(tgt_size, tgt_size).to('cuda') < 0
         # match query cannot see the reconstruct

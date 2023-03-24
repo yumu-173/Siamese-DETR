@@ -139,7 +139,7 @@ class DeformableTransformer(nn.Module):
         self.dn_label_noise_ratio = dn_label_noise_ratio
         self.dn_labelbook_size = dn_labelbook_size
 
-        self.pooling = nn.AdaptiveAvgPool1d(1).cuda()
+        self.pooling = nn.AdaptiveAvgPool2d(1).cuda()
         if self.attn_pool:
             self.attnpool = AttentionPool2d(16, d_model, nhead, d_model)
         if num_feature_levels > 1:
@@ -333,29 +333,25 @@ class DeformableTransformer(nn.Module):
             # bs, C, _, _ = feature.shape
             mask = feat[1]
             # print(mask)
-            feature = feature.transpose(2, 1).transpose(2, 3)
             feat_list = []
             for div in range(feature.shape[0]):
                 image_feature = feature[div]
-                # print('image_feature', image_feature.shape)
-                image_mask = mask[div]
-                # print(image_mask)
-                image_feature = image_feature[~image_mask].transpose(0, 1)
-                # print('after mask', image_feature.shape)
-                feat = self.pooling(image_feature)
-                # print('after pooling', feat.shape)
-                feat_list.append(feat[None, :, :])
-            feat = torch.cat(feat_list, dim=0).transpose(1, 2)
-            # print(feat.shape)
-            # import pdb; pdb.set_trace()
+                h_ = (~mask[div][:,0]).sum()
+                w_ = (~mask[div][0,:]).sum()
+                image_feature = feature[div][:, :h_, :w_]
+                # import pdb; pdb.set_trace()
+                feat = self.pooling(image_feature.unsqueeze(dim=0)).reshape(1, -1) # 1 x C
+                feat_list.append(feat) 
+            feat = torch.stack(feat_list, dim=0) # B x 1 x C
             feat = feat.repeat(1, use_num_queries, 1)
             # print(feat.shape)
             if i == 0:
                 target = feat
             else:
                 target = torch.cat([target, feat], 1)
-            # print('target:', target.shape)
-        return target
+
+        return target # B x L x C
+    
     def init_tgt_embed_with_attpool(self, use_num_queries, template_features):
         for i, feature in enumerate(template_features):
             # print(feature.shape)
@@ -485,7 +481,7 @@ class DeformableTransformer(nn.Module):
 
         elif self.two_stage_type == 'no':
             if self.attn_pool:
-                tgt_ = self.init_tgt_embed_with_attpool(self.num_queries // 4, template_features)
+                tgt_ = self.init_tgt_embed_with_attpool(self.num_queries // self.template_lvl, template_features)
             else:
                 tgt_ = self.init_tgt_embed(self.num_queries // self.template_lvl, template_features, temp_masks)
             #prepare for den

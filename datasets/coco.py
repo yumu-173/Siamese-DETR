@@ -466,7 +466,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         if self.image_set in ['val', 'test']:
             target_eval = deepcopy(target_2class)
             for index, _ in enumerate(target_2class):
-                print(index)
+                # print(index)
                 if target_2class[index]['category_id'] == 1:
                     target_eval.append(_)
             # print(target_eval)
