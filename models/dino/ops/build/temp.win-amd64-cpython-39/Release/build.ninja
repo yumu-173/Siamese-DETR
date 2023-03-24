@@ -1,0 +1,34 @@
+ninja_required_version = 1.3
+cxx = cl
+nvcc = D:\pycharm\cuda\cuda_manager\11.6.1\CUDA1\bin\nvcc
+
+cflags = /nologo /O2 /W3 /GL /DNDEBUG /MD /MD /wd4819 /wd4251 /wd4244 /wd4267 /wd4275 /wd4018 /wd4190 /EHsc -DWITH_CUDA -ID:\giga\detection\DINO\models\dino\ops\src -ID:\pycharm\anaconda2022\envs\pytorch\lib\site-packages\torch\include -ID:\pycharm\anaconda2022\envs\pytorch\lib\site-packages\torch\include\torch\csrc\api\include -ID:\pycharm\anaconda2022\envs\pytorch\lib\site-packages\torch\include\TH -ID:\pycharm\anaconda2022\envs\pytorch\lib\site-packages\torch\include\THC -ID:\pycharm\cuda\cuda_manager\11.6.1\CUDA1\include -ID:\pycharm\anaconda2022\envs\pytorch\include -ID:\pycharm\anaconda2022\envs\pytorch\Include -IE:\app\VS\IDE\VC\Tools\MSVC\14.29.30133\ATLMFC\include -IE:\app\VS\IDE\VC\Tools\MSVC\14.29.30133\include "-IE:\Windows Kits\10\include\10.0.19041.0\ucrt" "-IE:\Windows Kits\10\include\10.0.19041.0\shared" "-IE:\Windows Kits\10\include\10.0.19041.0\um" "-IE:\Windows Kits\10\include\10.0.19041.0\winrt" "-IE:\Windows Kits\10\include\10.0.19041.0\cppwinrt"
+post_cflags = -DTORCH_API_INCLUDE_EXTENSION_H -DTORCH_EXTENSION_NAME=MultiScaleDeformableAttention -D_GLIBCXX_USE_CXX11_ABI=0 /std:c++14
+cuda_cflags = --use-local-env -Xcompiler /MD -Xcompiler /wd4819 -Xcompiler /wd4251 -Xcompiler /wd4244 -Xcompiler /wd4267 -Xcompiler /wd4275 -Xcompiler /wd4018 -Xcompiler /wd4190 -Xcompiler /EHsc -Xcudafe --diag_suppress=base_class_has_different_dll_interface -Xcudafe --diag_suppress=field_without_dll_interface -Xcudafe --diag_suppress=dll_interface_conflict_none_assumed -Xcudafe --diag_suppress=dll_interface_conflict_dllexport_assumed -DWITH_CUDA -ID:\giga\detection\DINO\models\dino\ops\src -ID:\pycharm\anaconda2022\envs\pytorch\lib\site-packages\torch\include -ID:\pycharm\anaconda2022\envs\pytorch\lib\site-packages\torch\include\torch\csrc\api\include -ID:\pycharm\anaconda2022\envs\pytorch\lib\site-packages\torch\include\TH -ID:\pycharm\anaconda2022\envs\pytorch\lib\site-packages\torch\include\THC -ID:\pycharm\cuda\cuda_manager\11.6.1\CUDA1\include -ID:\pycharm\anaconda2022\envs\pytorch\include -ID:\pycharm\anaconda2022\envs\pytorch\Include -IE:\app\VS\IDE\VC\Tools\MSVC\14.29.30133\ATLMFC\include -IE:\app\VS\IDE\VC\Tools\MSVC\14.29.30133\include "-IE:\Windows Kits\10\include\10.0.19041.0\ucrt" "-IE:\Windows Kits\10\include\10.0.19041.0\shared" "-IE:\Windows Kits\10\include\10.0.19041.0\um" "-IE:\Windows Kits\10\include\10.0.19041.0\winrt" "-IE:\Windows Kits\10\include\10.0.19041.0\cppwinrt"
+cuda_post_cflags = -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__ -D__CUDA_NO_BFLOAT16_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__ --expt-relaxed-constexpr -DCUDA_HAS_FP16=1 -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__ -DTORCH_API_INCLUDE_EXTENSION_H -DTORCH_EXTENSION_NAME=MultiScaleDeformableAttention -D_GLIBCXX_USE_CXX11_ABI=0 -gencode=arch=compute_86,code=compute_86 -gencode=arch=compute_86,code=sm_86
+cuda_dlink_post_cflags = 
+ldflags = 
+
+rule compile
+  command = cl /showIncludes $cflags -c $in /Fo$out $post_cflags
+  deps = msvc
+
+rule cuda_compile
+  depfile = $out.d
+  deps = gcc
+  command = $nvcc --generate-dependencies-with-compile --dependency-output $out.d $cuda_cflags -c $in -o $out $cuda_post_cflags
+
+
+
+
+
+build D$:\giga\detection\DINO\models\dino\ops\build\temp.win-amd64-cpython-39\Release\giga\detection\DINO\models\dino\ops\src\cpu\ms_deform_attn_cpu.obj: compile D$:\giga\detection\DINO\models\dino\ops\src\cpu\ms_deform_attn_cpu.cpp
+build D$:\giga\detection\DINO\models\dino\ops\build\temp.win-amd64-cpython-39\Release\giga\detection\DINO\models\dino\ops\src\cuda\ms_deform_attn_cuda.obj: cuda_compile D$:\giga\detection\DINO\models\dino\ops\src\cuda\ms_deform_attn_cuda.cu
+build D$:\giga\detection\DINO\models\dino\ops\build\temp.win-amd64-cpython-39\Release\giga\detection\DINO\models\dino\ops\src\vision.obj: compile D$:\giga\detection\DINO\models\dino\ops\src\vision.cpp
+
+
+
+
+
+
+
