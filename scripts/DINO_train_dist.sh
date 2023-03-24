@@ -1,4 +1,3 @@
-coco_path='../dataset/COCO/'
 GPUS=`nvidia-smi -L | wc -l`
 # GPUS=1
 
@@ -12,6 +11,7 @@ echo "node count: ${NODE_COUNT}"
 echo "master addr: ${MASTER_ADDR}"
 echo "master port: ${MASTER_PORT}"
 
+coco_path=$1
 python -m torch.distributed.run --nproc_per_node=${GPUS} \
     --nnodes ${NODE_COUNT} \
     --node_rank ${RANK} \
