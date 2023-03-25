@@ -436,12 +436,18 @@ class CocoDetection(torchvision.datasets.CocoDetection):
             temp_idx = 0
         else:
             temp_idx = np.random.randint(0, num - 1)
+            choise_num = 0
+            while min(target['annotations'][temp_idx]['bbox'][2], target['annotations'][temp_idx]['bbox'][3]) <= 1 and choise_num < 5:
+                temp_idx = np.random.randint(0, num - 1)
+                choise_num += 1
         template_class = target['annotations'][temp_idx]['category_id']
         box = target['annotations'][temp_idx]['bbox']
         # print(box)
-        box[2] = box[0] + box[2]
-        box[3] = box[1] + box[3]
+        
+        box[2] = box[0] + max(1, box[2])
+        box[3] = box[1] + max(box[3], 1)
         template = img.crop(box)
+        print('template:', template.size)
 
         # find an image with the same class object
         new_img_id = random.choice(self.class_dict[template_class])
@@ -454,6 +460,11 @@ class CocoDetection(torchvision.datasets.CocoDetection):
             idx += 1
             img, target = super(CocoDetection, self).__getitem__(new_idx)
         image_id = new_img_id
+
+        # load another template
+        
+
+
         # print('sample image id:', image_id)
         target_2class = deepcopy(target)
         for item in target_2class:
@@ -598,7 +609,7 @@ def make_coco_transforms(image_set, fix_size=False, strong_aug=False, args=None)
     scales = [480, 512, 544, 576, 608, 640, 672, 704, 736, 768, 800]
     max_size = 1333
     scales2_resize = [400, 500, 600]
-    scales2_crop = [78, 120]
+    scales2_crop = [384, 600]
     
     # update args from config files
     scales = getattr(args, 'data_aug_scales', scales)
