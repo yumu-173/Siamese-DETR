@@ -447,7 +447,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         box[2] = box[0] + max(1, box[2])
         box[3] = box[1] + max(box[3], 1)
         template = img.crop(box)
-        print('template:', template.size)
+        # print('template:', template.size)
 
         # find an image with the same class object
         new_img_id = random.choice(self.class_dict[template_class])
