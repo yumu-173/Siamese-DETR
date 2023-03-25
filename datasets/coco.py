@@ -369,7 +369,6 @@ class CocoDetection(torchvision.datasets.CocoDetection):
             self.ids = sorted(self.ids)
             self.ids = self.ids[0:self.num_imgs]
 
-        ids1 = []
         for i in self.ids:
             target = self._load_target(i)
             # if len(target) > 0:
@@ -445,7 +444,6 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         template = img.crop(box)
 
         # find an image with the same class object
-        
         new_img_id = random.choice(self.class_dict[template_class])
         new_idx = self.ids.index(new_img_id)
         # load new image and target
@@ -464,7 +462,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
             else:
                 item['category_id'] = 0
         if self.image_set in ['val', 'test']:
-            target_eval = deepcopy(target_2class)
+            target_eval = []
             for index, _ in enumerate(target_2class):
                 # print(index)
                 if target_2class[index]['category_id'] == 1:
