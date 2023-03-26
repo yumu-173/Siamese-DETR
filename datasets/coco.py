@@ -400,11 +400,77 @@ class CocoDetection(torchvision.datasets.CocoDetection):
                 else:
                     self.class_dict[category_id].append(i)
 
+    def get_sequence_id_to_img_id(self):
+        for i in self.ids:
+            path = self.coco.loadImgs(i)[0]["file_name"]
+            sequence_name = path.split('/')[1]
+            image_name = path.split('/')[-1]
+            if sequence_name not in self.class_dict.keys():
+                self.class_dict[sequence_name] = {'image':[], 'template':[]}
+                self.class_dict[sequence_name]['image'].append(i)
+            else:
+                self.class_dict[sequence_name]['image'].append(i)
+            
+            if image_name == '000000.jpg':
+                self.class_dict[sequence_name]['template'] = self._load_target(i)
+            # print(path)
+            # exit(0)
+
     def __len__(self):
         # return 100
         return len(self.ids)
 
     def __getitem__(self, idx):
+        if self.image_set != 'test':
+            return self.getitem_train(idx)
+        else:
+            return self.getitem_test(idx)
+    
+    def getitem_test(self, idx):
+        try:
+            img, target = super(CocoDetection, self).__getitem__(idx)
+        except:
+            print("Error idx: {}".format(idx))
+            idx += 1
+            img, target = super(CocoDetection, self).__getitem__(idx)
+        image_id = self.ids[idx]
+        # print('template image id:', image_id)
+        target = {'image_id': image_id, 'annotations': target}
+
+        template_list = {}
+        for key in self.class_dict.keys():
+            if self.class_dict[key]['image'].count(image_id):
+                if key not in template_list.keys():
+                    template_idx = random.randint(0, len(self.class_dict[key]['template']))
+                    template_list[key] = template_idx
+                else:
+                    template_idx = template_list[key]
+                box = self.class_dict[key]['template'][template_idx]['bbox']
+        
+        box[2] = box[0] + max(1, box[2])
+        box[3] = box[1] + max(box[3], 1)
+        template = img.crop(box)
+
+        img, target = self.prepare(img, target)
+        if self._transforms is not None:
+            img, target = self._transforms(img, target)
+
+            template, _ = T.resize(template, target=None, size=400, max_size=400)
+            tran_template = T.Compose([ 
+                T.ToTensor(),
+                T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+            ])
+            template, _ = tran_template(template, target)
+
+        if self.aux_target_hacks is not None:
+            for hack_runner in self.aux_target_hacks:
+                target, img = hack_runner(target, img=img)
+
+        # print('sample:', img.shape)
+        # print('template:', template.shape)
+        return img, target, template, box
+    
+    def getitem_train(self, idx):
         """
         Output:
             - target: dict of multiple items
@@ -447,7 +513,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         box[2] = box[0] + max(1, box[2])
         box[3] = box[1] + max(box[3], 1)
         template = img.crop(box)
-        print('template:', template.size)
+        # print('template:', template.size)
 
         # find an image with the same class object
         new_img_id = random.choice(self.class_dict[template_class])
@@ -817,24 +883,27 @@ def build(image_set, args):
     root = Path(args.coco_path)
     # assert root.exists(), f'provided COCO path {root} does not exist'
     mode = 'instances'
-    # gmot_root = '../gmot-main/data/COCO/'
+    gmot_root = '../gmot-main/data/COCO/'
+    gmot_root = Path(gmot_root)
     PATHS = {
         "train": (root / 'train2017', root / "annotations" / f'{mode}_train2017.json'),
         "train_adj": (root, root / "annotations" / f'fsc_adj.json'),
-        # "test":(gmot_root, gmot_root / 'annotations' / f'gmot_test.json'),
+        "test":(gmot_root, gmot_root / 'annotations' / 'gmot_test.json'),
         "train_reg": (root / "train2017", root / "annotations" / f'{mode}_train2017.json'),
         "val": (root / 'val2017', root / "annotations" / f'{mode}_val2017.json'),
         "eval_debug": (root / "val2017", root / "annotations" / f'{mode}_val2017.json'),
-        "test": (root / "test2017", root / "annotations" / 'image_info_test-dev2017.json' ),
+        # "test": (root / "test2017", root / "annotations" / 'image_info_test-dev2017.json' ),
     }
 
     # add some hooks to datasets
     aux_target_hacks_list = get_aux_target_hacks_list(image_set, args)
     img_folder, ann_file = PATHS[image_set]
+    print('Dataset name:')
+    print(img_folder, ann_file)
 
     # copy to local path
     if os.environ.get('DATA_COPY_SHILONG') == 'INFO':
-        preparing_dataset(dict(img_folder=img_folder, ann_file=ann_file, template_file=template_file), image_set, args)
+        preparing_dataset(dict(img_folder=img_folder, ann_file=ann_file), image_set, args)
 
     try:
         strong_aug = args.strong_aug
@@ -846,8 +915,13 @@ def build(image_set, args):
             image_set=image_set,
             aux_target_hacks=aux_target_hacks_list,
         )
-    dataset.get_class_id_to_img_id()
-    print(dataset.class_dict.keys())
+    if image_set != 'test':
+        dataset.get_class_id_to_img_id()
+        print(dataset.class_dict.keys())
+    else:
+        dataset.get_sequence_id_to_img_id()
+        # print(dataset.class_dict)
+        # exit(0)
     # exit(0)
     return dataset
 

@@ -295,8 +295,13 @@ def main(args):
                 ema_m = ModelEma(model, args.ema_decay)        
 
     if args.test:
+        dataset_test = build_dataset(image_set='test', args=args)
+        sampler_test = torch.utils.data.RandomSampler(dataset_test)
+        batch_sampler_test = torch.utils.data.BatchSampler(sampler_test, args.batch_size, drop_last=True)
+        data_loader_test = DataLoader(dataset_test, batch_sampler=batch_sampler_test,
+                                    collate_fn=utils.collate_fn, num_workers=args.num_workers)
         test_stats = test(model, criterion, postprocessors,
-                                              data_loader_val, base_ds, device, args.output_dir, wo_class_error=wo_class_error, args=args)
+                                              data_loader_test, base_ds, device, args.output_dir, wo_class_error=wo_class_error, args=args)
         return
     
     if args.eval:
