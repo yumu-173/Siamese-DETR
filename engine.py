@@ -327,8 +327,9 @@ def test(model, criterion, postprocessors, data_loader, base_ds, device, output_
 
     final_res = []
     template_box = {}
-    for samples, targets, templates, temp_pos in metric_logger.log_every(data_loader, 100, header, logger=logger):
+    for samples, targets, templates in metric_logger.log_every(data_loader, 10, header, logger=logger):
         samples = samples.to(device)
+        # print('sample:', samples.shape)
         # import ipdb; ipdb.set_trace()
         # targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
         targets = [{k: to_device(v, device) for k, v in t.items()} for t in targets]
@@ -359,7 +360,7 @@ def test(model, criterion, postprocessors, data_loader, base_ds, device, output_
 
         for image_id, outputs in res.items():
 
-            template_box[int(image_id)] = temp_pos
+            # template_box[int(image_id)] = temp_pos
             # _scores = outputs['scores'].tolist()
             # _labels = outputs['labels'].tolist()
             # _boxes = outputs['boxes'].tolist()
@@ -396,8 +397,8 @@ def test(model, criterion, postprocessors, data_loader, base_ds, device, output_
         import json
         with open(args.output_dir + f'/results{args.rank}.json', 'w') as f:
             json.dump(final_res, f)  
-        with open(args.output_dir + f'/template{args.rank}.json', 'w') as f:
-            json.dump(template_box, f)      
+        # with open(args.output_dir + f'/template{args.rank}.json', 'w') as f:
+        #     json.dump(template_box, f)      
         
     # gather the stats from all processes
     # metric_logger.synchronize_between_processes()

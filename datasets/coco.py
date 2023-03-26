@@ -14,6 +14,7 @@ from pathlib import Path
 import random
 import os
 import numpy as np
+import cv2
 
 import torch
 import torch.utils.data
@@ -363,6 +364,8 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         self.aux_target_hacks = aux_target_hacks
         self.num_imgs = num_imgs
         self.class_dict = {}
+        if image_set == 'test':
+            self.template_list = {}
         self.image_set = image_set
 
         if self.num_imgs is not None:
@@ -412,6 +415,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
                 self.class_dict[sequence_name]['image'].append(i)
             
             if image_name == '000000.jpg':
+                self.class_dict[sequence_name]['template_img'] = i
                 self.class_dict[sequence_name]['template'] = self._load_target(i)
             # print(path)
             # exit(0)
@@ -437,19 +441,22 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         # print('template image id:', image_id)
         target = {'image_id': image_id, 'annotations': target}
 
-        template_list = {}
         for key in self.class_dict.keys():
             if self.class_dict[key]['image'].count(image_id):
-                if key not in template_list.keys():
-                    template_idx = random.randint(0, len(self.class_dict[key]['template']))
-                    template_list[key] = template_idx
+                # print('sequence:', key)
+                if key not in self.template_list.keys():
+                    template_idx = random.randint(0, len(self.class_dict[key]['template'])-1)
+                    box = self.class_dict[key]['template'][template_idx]['bbox']
+                    box[2] = box[0] + max(1, box[2])
+                    box[3] = box[1] + max(box[3], 1)
+                    # print(box)
+                    temp_image_id = self.class_dict[key]['template_img']
+                    template_img = self._load_image(temp_image_id)
+                    template = template_img.crop(box)
+                    cv2.imwrite('template/gmot/'+key+'.jpg', template)
+                    self.template_list[key] = template
                 else:
-                    template_idx = template_list[key]
-                box = self.class_dict[key]['template'][template_idx]['bbox']
-        
-        box[2] = box[0] + max(1, box[2])
-        box[3] = box[1] + max(box[3], 1)
-        template = img.crop(box)
+                    template = self.template_list[key]
 
         img, target = self.prepare(img, target)
         if self._transforms is not None:
@@ -468,7 +475,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
 
         # print('sample:', img.shape)
         # print('template:', template.shape)
-        return img, target, template, box
+        return img, target, template
     
     def getitem_train(self, idx):
         """
