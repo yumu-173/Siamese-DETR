@@ -137,7 +137,8 @@ class DINO(nn.Module):
                             nn.Conv2d(in_channels, hidden_dim, kernel_size=1),
                             nn.GroupNorm(32, hidden_dim),
                         ))
-                if self.template_lvl == 4:
+                    print('temp_input_proj_list', temp_input_proj_list)
+                elif self.template_lvl == 4:
                     for _ in range(num_backbone_outs):
                         # import pdb; pdb.set_trace()
                         in_channels = backbone.num_channels[_]
@@ -291,6 +292,11 @@ class DINO(nn.Module):
             samples = nested_tensor_from_tensor_list(samples)
         # import pdb; pdb.set_trace()
         templates = nested_tensor_from_tensor_list(templates).to('cuda')
+        # template = []
+        # for template_list in templates:
+        #     for item in template_list:
+        #         template.append(item)
+        # templates = nested_tensor_from_tensor_list(template).to('cuda')
 
         temp_features, temp_poss = self.backbone(templates)
         features, poss = self.backbone(samples)
@@ -377,12 +383,13 @@ class DINO(nn.Module):
                 masks.append(mask)
                 poss.append(pos_l)
                 
+        # import pdb; pdb.set_trace()
         if self.template_lvl == 4 and self.num_feature_levels > len(temp_srcs):
             _len_srcs = len(temp_srcs)
             # print('_len_srcs', _len_srcs)
             for l in range(_len_srcs, self.num_feature_levels):
                 if l == _len_srcs:
-                    temp_src = self.temp_input_proj[l](features[-1].tensors)
+                    temp_src = self.temp_input_proj[l](temp_features[-1].tensors)
                 else:
                     temp_src = self.temp_input_proj[l](srcs[-1])
                 m = templates.mask
