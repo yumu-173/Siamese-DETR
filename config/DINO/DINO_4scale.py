@@ -1,7 +1,7 @@
 _base_ = ['coco_transformer.py']
 
 num_classes = 2
-template_lvl = 4
+template_lvl = 1
 
 lr = 0.0001
 param_dict_type = 'default'
@@ -18,7 +18,7 @@ save_checkpoint_interval = 1
 clip_max_norm = 0.1
 onecyclelr = False
 multi_step_lr = False
-lr_drop_list = [33, 45]
+lr_drop_list = [11, 20, 30]
 
 
 modelname = 'dino'

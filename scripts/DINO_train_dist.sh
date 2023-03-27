@@ -22,4 +22,4 @@ python -m torch.distributed.run --nproc_per_node=${GPUS} \
     --rank ${RANK} \
     --n_nodes ${NODE_COUNT} \
     --batch_size=2 \
-    --output_dir logs/DINO/R50-MS4-coco3
+    --output_dir logs/DINO/R50-MS4-coco4
