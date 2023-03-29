@@ -111,6 +111,7 @@ class DeformableTransformer(nn.Module):
                  attn_pool=True,
                  # for template levels
                  template_lvl=4,
+                 number_template=2,
                  # for dn
                  dn_number = 100,
                  dn_box_noise_scale = 0.4,
@@ -120,6 +121,7 @@ class DeformableTransformer(nn.Module):
         super().__init__()
         self.attn_pool = attn_pool
         self.template_lvl = template_lvl
+        self.number_template = number_template
         self.num_feature_levels = num_feature_levels
         self.num_encoder_layers = num_encoder_layers
         self.num_unicoder_layers = num_unicoder_layers
@@ -324,7 +326,7 @@ class DeformableTransformer(nn.Module):
         #     self.refpoint_embed.weight.data[:, :2] = inverse_sigmoid(self.refpoint_embed.weight.data[:, :2])
         #     self.refpoint_embed.weight.data[:, :2].requires_grad = False
 
-    def init_tgt_embed(self, use_num_queries, template_features, temp_masks):
+    def init_tgt_embed(self, use_num_queries, template_features, temp_masks, number_template):
         # template_features = template_features[4-template_lvl:]
         for i, feat in enumerate(zip(template_features, temp_masks)):
             # print(feature.shape)
@@ -349,7 +351,6 @@ class DeformableTransformer(nn.Module):
                 target = feat
             else:
                 target = torch.cat([target, feat], 1)
-
         return target # B x L x C
     
     def init_tgt_embed_with_attpool(self, use_num_queries, template_features):
@@ -483,24 +484,57 @@ class DeformableTransformer(nn.Module):
             if self.attn_pool:
                 tgt_ = self.init_tgt_embed_with_attpool(self.num_queries // self.template_lvl, template_features)
             else:
-                tgt_ = self.init_tgt_embed(self.num_queries // self.template_lvl, template_features, temp_masks)
+                tgt_ = self.init_tgt_embed(self.num_queries // self.template_lvl, template_features, temp_masks, self.number_template)
             #prepare for den
             tgt, refpoint_embed, attn_mask, dn_meta =\
                     prepare_for_sample_dn(dn_args=(targets, self.dn_number, self.dn_label_noise_ratio, self.dn_box_noise_scale),
                                             training=self.training, num_queries=self.num_queries, hidden_dim=self.d_model, query_label=tgt_)
-
             # tgt_ = self.tgt_embed.weight[:, None, :].repeat(1, bs, 1).transpose(0, 1) # nq, bs, d_model
             
             if self.random_refpoints_xy:
                 refpoint_embed_ = torch.cat((self.refpoint_embed_xy.weight, self.refpoint_embed_wh.weight), dim=1)[:, None, :].repeat(1, bs, 1).transpose(0, 1) # nq, bs, 4
             else:
-                refpoint_embed_ = self.refpoint_embed.weight[:, None, :].repeat(1, bs, 1).transpose(0, 1) # nq, bs, 4
-
+                refpoint_embed_ = self.refpoint_embed.weight[:, None, :].repeat(1, bs*self.number_template, 1).transpose(0, 1) # nq, bs, 4
+            # refpoint_embed_ = torch.cat([refpoint_embed_, refpoint_embed_], dim=1)
+            # import pdb; pdb.set_trace()
             if refpoint_embed is not None:
                 refpoint_embed = torch.cat([refpoint_embed, refpoint_embed_], dim=1)
                 tgt = torch.cat([tgt, tgt_], dim=1)
             else:
                 refpoint_embed, tgt = refpoint_embed_, tgt_
+            # merge attn-mask
+            if self.training:
+                for n in range(self.number_template):
+                    if n == 0:
+                        merge_mask = attn_mask
+                    else:
+                        len_a = merge_mask.shape[0]
+                        len_b = attn_mask.shape[0]
+                        up = torch.cat((merge_mask, torch.ones((len_a, len_b), dtype=torch.bool).cuda()), dim=1)  
+                        down = torch.cat((torch.ones((len_b, len_a), dtype=torch.bool).cuda(), attn_mask), dim=1)  
+                        merge_mask = torch.cat((up, down), dim=0)
+                attn_mask = merge_mask
+                # import pdb; pdb.set_trace()
+            # merge query
+            target_merge_list = []
+            target_split_list = torch.split(tgt, 1, dim = 0)
+            for bs in range(int(tgt.shape[0] / self.number_template)):
+                merge_list = target_split_list[bs*self.number_template:bs*self.number_template+self.number_template]
+                merge = torch.cat(merge_list, dim=1)
+                # import pdb; pdb.set_trace()
+                target_merge_list.append(merge)
+            tgt = torch.cat(target_merge_list, dim=0)
+            # merge refpoint_embed
+            refpoint_embed_merge_list = []
+            refpoint_embed_split_list = torch.split(refpoint_embed, 1, dim = 0)
+            for bs in range(int(refpoint_embed.shape[0] / self.number_template)):
+                merge_list = refpoint_embed_split_list[bs*self.number_template:bs*self.number_template+self.number_template]
+                merge = torch.cat(merge_list, dim=1)
+                # import pdb; pdb.set_trace()
+                refpoint_embed_merge_list.append(merge)
+            refpoint_embed = torch.cat(refpoint_embed_merge_list, dim=0)
+            # import pdb; pdb.set_trace()
+
 
             if self.num_patterns > 0:
                 tgt_embed = tgt.repeat(1, self.num_patterns, 1)
@@ -1208,6 +1242,7 @@ def build_deformable_transformer(args):
         random_refpoints_xy=args.random_refpoints_xy,
         attn_pool=args.attnpool,
         template_lvl=args.template_lvl,
+        number_template=args.number_template,
 
         # two stage
         two_stage_type=args.two_stage_type, # ['no', 'standard', 'early']

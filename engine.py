@@ -36,25 +36,32 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     if not wo_class_error:
         metric_logger.add_meter('class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
     header = 'Epoch: [{}]'.format(epoch)
-    print_freq = 1000
+    print_freq = 100
 
     _cnt = 0
     for samples, targets, templates, temp_pos in metric_logger.log_every(data_loader, print_freq, header, logger=logger):
 
         samples = samples.to(device)
+        merge_targets = []
+        for target_list in targets:
+            merge_targets.extend(target_list)
+        targets = merge_targets 
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
+        # print('enter', targets[0]['boxes'].shape)
 
         with torch.cuda.amp.autocast(enabled=args.amp):
             if need_tgt_for_training:
                 # ------------------------------------------------------------------------------------------------------
-                # print('targets:', len(targets[0]['boxes']))
+                # print('targets:', len(targets))
+                # import pdb; pdb.set_trace()
                 # print('poss:', temp_pos)
                 # ------------------------------------------------------------------------------------------------------
                 outputs, targets = model(samples, templates, targets, temp_pos)
             else:
                 outputs, _ = model(samples)
-        
-            loss_dict = criterion(outputs, targets)
+            # import pdb; pdb.set_trace()
+            # print('loss', targets[0]['boxes'].shape)
+            loss_dict, targets = criterion(outputs, targets)
             weight_dict = criterion.weight_dict
             # import ipdb; ipdb.set_trace()
             losses = sum(loss_dict[k] * weight_dict[k] for k in loss_dict.keys() if k in weight_dict)
@@ -163,17 +170,21 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, out
     for samples, targets, templates, temp_pos in metric_logger.log_every(data_loader, 100, header, logger=logger):
         samples = samples.to(device)
         # import ipdb; ipdb.set_trace()
-        # targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
+        merge_targets = []
+        for target_list in targets:
+            merge_targets.extend(target_list)
+        targets = merge_targets
         targets = [{k: to_device(v, device) for k, v in t.items()} for t in targets]
+        # import pdb; pdb.set_trace()
 
         with torch.cuda.amp.autocast(enabled=args.amp):
             if need_tgt_for_training:
-                outputs, _ = model(samples, templates, targets)
+                outputs, targets = model(samples, templates, targets)
             else:
                 outputs, _ = model(samples, templates)
             # outputs = model(samples)
 
-            loss_dict = criterion(outputs, targets)
+            loss_dict, targets = criterion(outputs, targets)
         weight_dict = criterion.weight_dict
 
         # reduce losses over all GPUs for logging purposes
@@ -187,8 +198,9 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, out
                              **loss_dict_reduced_unscaled)
         if 'class_error' in loss_dict_reduced:
             metric_logger.update(class_error=loss_dict_reduced['class_error'])
-
+        # import pdb; pdb.set_trace()
         orig_target_sizes = torch.stack([t["orig_size"] for t in targets], dim=0)
+        # import pdb; pdb.set_trace()
         results = postprocessors['bbox'](outputs, orig_target_sizes)
         # [scores: [100], labels: [100], boxes: [100, 4]] x B
         if 'segm' in postprocessors.keys():

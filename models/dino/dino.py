@@ -62,6 +62,7 @@ class DINO(nn.Module):
                     temp_weight=False,
                     denoise_query=False,
                     template_lvl=4,
+                    number_template=1,
                     ):
         """ Initializes the model.
         Parameters:
@@ -87,6 +88,7 @@ class DINO(nn.Module):
         self.share_weight = temp_weight
         self.denoise_query = denoise_query
         self.template_lvl = template_lvl
+        self.number_template = number_template
 
         # setting query dim
         self.query_dim = query_dim
@@ -291,12 +293,11 @@ class DINO(nn.Module):
         if isinstance(samples, (list, torch.Tensor)):
             samples = nested_tensor_from_tensor_list(samples)
         # import pdb; pdb.set_trace()
-        templates = nested_tensor_from_tensor_list(templates).to('cuda')
-        # template = []
-        # for template_list in templates:
-        #     for item in template_list:
-        #         template.append(item)
-        # templates = nested_tensor_from_tensor_list(template).to('cuda')
+        # templates = nested_tensor_from_tensor_list(templates).to('cuda')
+        template = []
+        for template_list in templates:
+            template.extend(template_list)
+        templates = nested_tensor_from_tensor_list(template).to('cuda')
 
         temp_features, temp_poss = self.backbone(templates)
         features, poss = self.backbone(samples)
@@ -423,6 +424,24 @@ class DINO(nn.Module):
         # hs, reference, hs_enc, ref_enc, init_box_proposal = self.transformer(srcs, masks, input_query_bbox, poss, input_query_label, temp_srcs, temp_masks, attn_mask)
         hs, reference, hs_enc, ref_enc, init_box_proposal, dn_meta = self.transformer(srcs, masks, poss, temp_srcs, temp_masks, targets)
 
+        # split output into batch
+        if self.two_stage_type == 'standard':
+            raise NotImplementedError
+        split_hs = []
+        for hs_item in hs:
+            split_num = hs_item.shape[1] // self.number_template
+            hs_item = torch.split(hs_item, split_num, dim = 1)
+            hs_item = torch.cat(hs_item, dim=0)
+            split_hs.append(hs_item)
+        hs = split_hs
+        split_reference = []
+        for reference_item in reference:
+            split_num = reference_item.shape[1] // self.number_template
+            reference_item = torch.split(reference_item, split_num, dim = 1)
+            reference_item = torch.cat(reference_item, dim=0)
+            split_reference.append(reference_item)
+        reference = split_reference
+        # import pdb; pdb.set_trace()
         # In case num object=0
         hs[0] += self.label_enc.weight[0, 0] * 0.0
 
@@ -497,7 +516,7 @@ class SetCriterion(nn.Module):
         1) we compute hungarian assignment between ground truth boxes and the outputs of the model
         2) we supervise each pair of matched ground-truth / prediction (supervise class and box)
     """
-    def __init__(self, num_classes, matcher, weight_dict, focal_alpha, losses):
+    def __init__(self, num_classes, matcher, weight_dict, focal_alpha, losses,):
         """ Create the criterion.
         Parameters:
             num_classes: number of object categories, omitting the special no-object category
@@ -513,19 +532,17 @@ class SetCriterion(nn.Module):
         self.losses = losses
         self.focal_alpha = focal_alpha
 
-    def loss_labels(self, outputs, targets, indices, num_boxes, log=True):
+    def loss_labels(self, outputs, targets, indices, num_boxes, loss_name, log=True):
         """Classification loss (Binary focal loss)
         targets dicts must contain the key "labels" containing a tensor of dim [nb_target_boxes]
         """
         assert 'pred_logits' in outputs
         src_logits = outputs['pred_logits']
-
         idx = self._get_src_permutation_idx(indices)
-        target_classes_o = torch.cat([t["labels"][J] for t, (_, J) in zip(targets, indices)])
+        target_classes_o = torch.cat([t["labels"][J] for t, (_, J) in zip(targets, indices)]) 
         target_classes = torch.full(src_logits.shape[:2], self.num_classes,
                                     dtype=torch.int64, device=src_logits.device)
         target_classes[idx] = target_classes_o
-
         target_classes_onehot = torch.zeros([src_logits.shape[0], src_logits.shape[1], src_logits.shape[2]+1],
                                             dtype=src_logits.dtype, layout=src_logits.layout, device=src_logits.device)
         target_classes_onehot.scatter_(2, target_classes.unsqueeze(-1), 1)
@@ -540,7 +557,7 @@ class SetCriterion(nn.Module):
         return losses
 
     @torch.no_grad()
-    def loss_cardinality(self, outputs, targets, indices, num_boxes):
+    def loss_cardinality(self, outputs, targets, indices, num_boxes, loss_name):
         """ Compute the cardinality error, ie the absolute error in the number of predicted non-empty boxes
         This is not really a loss, it is intended for logging purposes only. It doesn't propagate gradients
         """
@@ -548,12 +565,14 @@ class SetCriterion(nn.Module):
         device = pred_logits.device
         tgt_lengths = torch.as_tensor([len(v["labels"]) for v in targets], device=device)
         # Count the number of predictions that are NOT "no-object" (which is the last class)
+        # import pdb; pdb.set_trace()
+        # print(loss_name)
         card_pred = (pred_logits.argmax(-1) != pred_logits.shape[-1] - 1).sum(1)
         card_err = F.l1_loss(card_pred.float(), tgt_lengths.float())
         losses = {'cardinality_error': card_err}
         return losses
 
-    def loss_boxes(self, outputs, targets, indices, num_boxes):
+    def loss_boxes(self, outputs, targets, indices, num_boxes, loss_name):
         """Compute the losses related to the bounding boxes, the L1 regression loss and the GIoU loss
            targets dicts must contain the key "boxes" containing a tensor of dim [nb_target_boxes, 4]
            The target boxes are expected in format (center_x, center_y, w, h), normalized by the image size.
@@ -581,7 +600,7 @@ class SetCriterion(nn.Module):
 
         return losses
 
-    def loss_masks(self, outputs, targets, indices, num_boxes):
+    def loss_masks(self, outputs, targets, indices, num_boxes, loss_name):
         """Compute the losses related to the masks: the focal loss and the dice loss.
            targets dicts must contain the key "masks" containing a tensor of dim [nb_target_boxes, h, w]
         """
@@ -622,7 +641,8 @@ class SetCriterion(nn.Module):
         tgt_idx = torch.cat([tgt for (_, tgt) in indices])
         return batch_idx, tgt_idx
 
-    def get_loss(self, loss, outputs, targets, indices, num_boxes, **kwargs):
+    def get_loss(self, loss, outputs, targets, indices, num_boxes, loss_name='dn', **kwargs):
+        # print('loss_name', loss_name)
         loss_map = {
             'labels': self.loss_labels,
             'cardinality': self.loss_cardinality,
@@ -632,7 +652,7 @@ class SetCriterion(nn.Module):
             # 'dn_boxes': self.loss_dn_boxes
         }
         assert loss in loss_map, f'do you really want to compute {loss} loss?'
-        return loss_map[loss](outputs, targets, indices, num_boxes, **kwargs)
+        return loss_map[loss](outputs, targets, indices, num_boxes, loss_name=loss_name, **kwargs)
 
     def forward(self, outputs, targets, return_indices=False):
         """ This performs the loss computation.
@@ -644,6 +664,7 @@ class SetCriterion(nn.Module):
              return_indices: used for vis. if True, the layer0-5 indices will be returned as well.
 
         """
+        # import pdb; pdb.set_trace()
         outputs_without_aux = {k: v for k, v in outputs.items() if k != 'aux_outputs'}
         device = next(iter(outputs.values())).device
         indices = self.matcher(outputs_without_aux, targets)
@@ -694,6 +715,11 @@ class SetCriterion(nn.Module):
 
 
             output_known_lbs_bboxes = dn_meta['output_known_lbs_bboxes']
+            # print('output_known_lbs_bboxes', output_known_lbs_bboxes.keys())
+            # print('pred_boxes', output_known_lbs_bboxes['pred_boxes'].shape)
+            # print('pred_logits', output_known_lbs_bboxes['pred_logits'].shape)
+            # print('aux_outputs',output_known_lbs_bboxes['aux_outputs'][0])
+            # exit(0)
             l_dict = {}
             for loss in self.losses:
                 kwargs = {}
@@ -715,11 +741,13 @@ class SetCriterion(nn.Module):
 
 
         for loss in self.losses:
-            losses.update(self.get_loss(loss, outputs, targets, indices, num_boxes))
+            # print(loss)
+            losses.update(self.get_loss(loss, outputs, targets, indices, num_boxes, loss_name='pred'))
 
         # In case of auxiliary losses, we repeat this process with the output of each intermediate layer.
         if 'aux_outputs' in outputs:
             for idx, aux_outputs in enumerate(outputs['aux_outputs']):
+                # import pdb; pdb.set_trace()
                 indices = self.matcher(aux_outputs, targets)
                 if return_indices:
                     indices_list.append(indices)
@@ -737,13 +765,14 @@ class SetCriterion(nn.Module):
 
                 if self.training and dn_meta and 'output_known_lbs_bboxes' in dn_meta:
                     aux_outputs_known = output_known_lbs_bboxes['aux_outputs'][idx]
+                    # import pdb; pdb.set_trace()
                     l_dict={}
                     for loss in self.losses:
                         kwargs = {}
                         if 'labels' in loss:
                             kwargs = {'log': False}
 
-                        l_dict.update(self.get_loss(loss, aux_outputs_known, targets, dn_pos_idx, num_boxes*scalar,
+                        l_dict.update(self.get_loss(loss, aux_outputs_known, dn_target, dn_pos_idx, num_boxes*scalar,
                                                                  **kwargs))
 
                     l_dict = {k + f'_dn_{idx}': v for k, v in l_dict.items()}
@@ -800,7 +829,7 @@ class SetCriterion(nn.Module):
             indices_list.append(indices0_copy)
             return losses, indices_list
 
-        return losses
+        return losses, targets
 
     def prep_for_dn(self,dn_meta):
         output_known_lbs_bboxes = dn_meta['output_known_lbs_bboxes']
@@ -829,7 +858,7 @@ class PostProcess(nn.Module):
         """
         num_select = self.num_select
         out_logits, out_bbox = outputs['pred_logits'], outputs['pred_boxes']
-
+        # import pdb; pdb.set_trace()
         assert len(out_logits) == len(target_sizes)
         assert target_sizes.shape[1] == 2
 
@@ -933,6 +962,7 @@ def build_dino(args):
         temp_weight = args.temp_weight,
         denoise_query = args.denoise_query,
         template_lvl = args.template_lvl,
+        number_template = args.number_template
     )
     if args.masks:
         model = DETRsegm(model, freeze_detr=(args.frozen_weights is not None))
@@ -984,8 +1014,8 @@ def build_dino(args):
     if args.masks:
         losses += ["masks"]
     criterion = SetCriterion(num_classes, matcher=matcher, weight_dict=weight_dict,
-                             focal_alpha=args.focal_alpha, losses=losses,
-                             )
+                             focal_alpha=args.focal_alpha, losses=losses
+                            )
     criterion.to(device)
     postprocessors = {'bbox': PostProcess(num_select=args.num_select, nms_iou_threshold=args.nms_iou_threshold)}
     if args.masks:

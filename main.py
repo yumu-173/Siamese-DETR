@@ -384,7 +384,7 @@ def main(args):
             }, checkpoint_path)
         log_stats = {
             **{f'train_{k}': v for k, v in train_stats.items()},
-            **{f'test_{k}': v for k, v in test_stats.items()},
+            # **{f'test_{k}': v for k, v in test_stats.items()},
         }
 
         # eval ema

@@ -357,7 +357,7 @@ dataset_hook_register = {
 
 class CocoDetection(torchvision.datasets.CocoDetection):
     def __init__(self, img_folder, ann_file, transforms, return_masks, image_set, aux_target_hacks=None,
-                 num_imgs=None):
+                 num_imgs=None, number_template=None):
         super(CocoDetection, self).__init__(img_folder, ann_file)
         self._transforms = transforms
         self.prepare = ConvertCocoPolysToMask(return_masks)
@@ -367,6 +367,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         if image_set == 'test':
             self.template_list = {}
         self.image_set = image_set
+        self.number_template = number_template
 
         if self.num_imgs is not None:
             self.ids = sorted(self.ids)
@@ -504,59 +505,91 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         # --------------------------------------------------------------------------------------------------------------
         # template
         num = len(target['annotations'])
+        # print('*****num:{}*****'.format(num))
+        template_list = []
+        targets_list = []
         # print(num)
-        if num == 1:
-            temp_idx = 0
-        else:
-            temp_idx = np.random.randint(0, num - 1)
-            choise_num = 0
-            while min(target['annotations'][temp_idx]['bbox'][2], target['annotations'][temp_idx]['bbox'][3]) <= 1 and choise_num < 5:
-                temp_idx = np.random.randint(0, num - 1)
-                choise_num += 1
-        template_class = target['annotations'][temp_idx]['category_id']
-        box = target['annotations'][temp_idx]['bbox']
-        # print(box)
-        
-        box[2] = box[0] + max(1, box[2])
-        box[3] = box[1] + max(box[3], 1)
-        template = img.crop(box)
-        # print('template:', template.size)
-
-        # find an image with the same class object
-        new_img_id = random.choice(self.class_dict[template_class])
-        new_idx = self.ids.index(new_img_id)
-        # load new image and target
-        try:
-            img, target = super(CocoDetection, self).__getitem__(new_idx)
-        except:
-            print("Error idx: {}".format(idx))
-            idx += 1
-            img, target = super(CocoDetection, self).__getitem__(new_idx)
-        image_id = new_img_id
-
-        # load another template
-        
-
-
-        # print('sample image id:', image_id)
-        target_2class = deepcopy(target)
-        for item in target_2class:
-            if item['category_id'] == template_class:
-                item['category_id'] = 1
+        if self.number_template == 1:
+            if num == 1:
+                temp_idx = 0
             else:
-                item['category_id'] = 0
-        if self.image_set in ['val', 'test']:
-            target_eval = []
-            for index, _ in enumerate(target_2class):
-                # print(index)
-                if target_2class[index]['category_id'] == 1:
-                    target_eval.append(_)
-            # print(target_eval)
-            target_2class = target_eval
-            # exit(0)
+                temp_idx = np.random.randint(0, num - 1)
+                choise_num = 0
+                while min(target['annotations'][temp_idx]['bbox'][2], target['annotations'][temp_idx]['bbox'][3]) <= 1 and choise_num < 5:
+                    temp_idx = np.random.randint(0, num - 1)
+                    choise_num += 1
+            template_class = target['annotations'][temp_idx]['category_id']
+            box = target['annotations'][temp_idx]['bbox']
+            # print(box)
+            
+            box[2] = box[0] + max(1, box[2])
+            box[3] = box[1] + max(box[3], 1)
+            template = img.crop(box)
+            template_list.append(template)
+            # print('template:', template.size)
 
-        # print(target)
-        target = {'image_id': image_id, 'annotations': target_2class}
+            # find an image with the same class object
+            new_img_id = random.choice(self.class_dict[template_class])
+            new_idx = self.ids.index(new_img_id)
+            # load new image and target
+            try:
+                img, target = super(CocoDetection, self).__getitem__(new_idx)
+            except:
+                print("Error idx: {}".format(idx))
+                idx += 1
+                img, target = super(CocoDetection, self).__getitem__(new_idx)
+            image_id = new_img_id
+
+            # print('sample image id:', image_id)
+            target_2class = deepcopy(target)
+            for item in target_2class:
+                if item['category_id'] == template_class:
+                    item['category_id'] = 1
+                    item['template_id'] = 0
+                else:
+                    item['category_id'] = 0
+                    item['template_id'] = 0
+                targets_list.append(item)
+            # target = {'image_id': image_id, 'annotations': target_2class} 
+        
+        # use more than 1 template
+        if self.number_template > 1:
+            temp_ann = []
+            while len(temp_ann) < self.number_template:
+                temp_ann += deepcopy(target['annotations'])
+            
+            # load another template
+            for _ in range(self.number_template):
+                index_list = list(range(0, len(temp_ann)))
+                temp_idx = random.choice(index_list)
+                index_list.remove(temp_idx)
+                template_class = temp_ann[temp_idx]['category_id']
+                new_img_id = random.choice(self.class_dict[template_class])
+                new_idx = self.ids.index(new_img_id)
+                new_img, new_img_target = super(CocoDetection, self).__getitem__(new_idx)
+                template_anno = list(filter(lambda item: item['category_id'] == template_class, new_img_target))
+                if len(template_anno) > 1:
+                    box = template_anno[np.random.randint(0, max(len(template_anno) - 1, 0))]['bbox']
+                else:
+                    box = template_anno[0]['bbox']
+                box[2] = box[0] + max(1, box[2])
+                box[3] = box[1] + max(box[3], 1)
+                template = new_img.crop(box)
+                template_list.append(template)
+                # change target
+                target_2class = deepcopy(target['annotations'])
+                for item in target_2class:
+                    if item['category_id'] == template_class:
+                        item['category_id'] = 1
+                        item['template_id'] = _
+                    else:
+                        item['category_id'] = 0
+                        item['template_id'] = _
+                    targets_list.append(item)
+
+            # print('targets_list:', len(targets_list))
+            # import pdb; pdb.set_trace()
+        target = {'image_id': image_id, 'annotations': targets_list}
         # --------------------------------------------------------------------------------------------------------------
         img, target = self.prepare(img, target)
         # print('target:', target)
@@ -565,13 +598,17 @@ class CocoDetection(torchvision.datasets.CocoDetection):
             img, target = self._transforms(img, target)
             # print('target2:', len(target['boxes']))
             # ----------------------------------------------------------------------------------------------------------   
-            template, _ = T.resize(template, target=None, size=400, max_size=400)
-            # print(template)
+            return_template_list = []
             tran_template = T.Compose([ 
                 T.ToTensor(),
                 T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
             ])
-            template, _ = tran_template(template, target)
+            for template in template_list:    
+                template, _ = T.resize(template, target=None, size=400, max_size=400)
+                # print(template)
+                template, _ = tran_template(template, target)
+                # print('template:', template.shape)
+                return_template_list.append(template)
             # ----------------------------------------------------------------------------------------------------------
             # print(img.shape)
             # print(template.shape)
@@ -582,7 +619,22 @@ class CocoDetection(torchvision.datasets.CocoDetection):
             for hack_runner in self.aux_target_hacks:
                 target, img = hack_runner(target, img=img)
 
-        return img, target, template, box
+        # split target into bs*template_num
+        new_targets = []
+        for num in range(self.number_template):
+            new_t = {}
+            keep = target['template_id']==num
+            # import pdb; pdb.set_trace()
+            for key in target.keys():
+                if key in ['boxes', 'labels', 'iscrowd', 'area', 'template_id']:
+                    new_t[key] = target[key][keep]
+                    # targets[key] = targets[key][keep]
+                else:
+                    new_t[key] = target[key]
+            new_targets.append(new_t)
+        target = new_targets
+
+        return img, target, return_template_list, box
 
 
 def convert_coco_poly_to_mask(segmentations, height, width):
@@ -617,6 +669,10 @@ class ConvertCocoPolysToMask(object):
         anno = [obj for obj in anno if 'iscrowd' not in obj or obj['iscrowd'] == 0]
 
         boxes = [obj["bbox"] for obj in anno]
+
+        template = [obj["template_id"] for obj in anno]
+        template = torch.tensor(template, dtype=torch.int64)
+        # print('template_id', template)
         # guard against no boxes via resizing
         boxes = torch.as_tensor(boxes, dtype=torch.float32).reshape(-1, 4)
         boxes[:, 2:] += boxes[:, :2]
@@ -641,6 +697,8 @@ class ConvertCocoPolysToMask(object):
         keep = (boxes[:, 3] > boxes[:, 1]) & (boxes[:, 2] > boxes[:, 0])
         boxes = boxes[keep]
         classes = classes[keep]
+        template = template[keep]
+        # import pdb; pdb.set_trace()
         if self.return_masks:
             masks = masks[keep]
         if keypoints is not None:
@@ -652,6 +710,7 @@ class ConvertCocoPolysToMask(object):
         if self.return_masks:
             target["masks"] = masks
         target["image_id"] = image_id
+        target["template_id"] = template
         if keypoints is not None:
             target["keypoints"] = keypoints
 
@@ -921,6 +980,8 @@ def build(image_set, args):
             return_masks=args.masks,
             image_set=image_set,
             aux_target_hacks=aux_target_hacks_list,
+            number_template=args.number_template,
+            # num_imgs=100,
         )
     if image_set != 'test':
         dataset.get_class_id_to_img_id()

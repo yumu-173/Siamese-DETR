@@ -12,6 +12,8 @@ import torch
 import torchvision
 import random
 import numpy as np
+from copy import deepcopy
+
 from util.misc import (NestedTensor, nested_tensor_from_tensor_list,
                        accuracy, get_world_size, interpolate,
                        is_dist_avail_and_initialized, inverse_sigmoid)
@@ -52,7 +54,7 @@ def prepare_for_sample_dn(dn_args, training, num_queries, hidden_dim, query_labe
             targets_list.append(t)
         targets = targets_list
 
-        known = [(torch.ones_like(t['labels'])).cuda() for t in targets]
+        known = [(torch.ones_like(t['labels_dn'])).cuda() for t in targets]
         batch_size = len(known)
         known_num = [sum(k) for k in known]
 
@@ -67,9 +69,9 @@ def prepare_for_sample_dn(dn_args, training, num_queries, hidden_dim, query_labe
             dn_number = 1
         unmask_bbox = unmask_label = torch.cat(known)
         # labels = torch.cat([t['labels'] for t in targets])
-        boxes = torch.cat([t['boxes'] for t in targets])
+        boxes = torch.cat([t['boxes_dn'] for t in targets])
 
-        batch_idx = torch.cat([torch.full_like(t['labels'].long(), i) for i, t in enumerate(targets)])
+        batch_idx = torch.cat([torch.full_like(t['labels_dn'].long(), i) for i, t in enumerate(targets)])
         
         query_idx = torch.randint(0, num_queries, (batch_idx.shape[0],)).to(batch_idx)
         label_dn = query_label[batch_idx, query_idx, :] # num_targets x C
@@ -150,6 +152,12 @@ def prepare_for_sample_dn(dn_args, training, num_queries, hidden_dim, query_labe
             'pad_size': pad_size,
             'num_dn_group': dn_number,
         }
+
+        # recover target with multi-template
+        # for t1, t2 in zip(targets_copy, targets):
+        #     # print(t1.keys())
+        #     for key in t1.keys():
+        #         t2[key] = t1[key]
     else:
 
         input_query_label = None
@@ -157,6 +165,8 @@ def prepare_for_sample_dn(dn_args, training, num_queries, hidden_dim, query_labe
         attn_mask = None
         dn_meta = None
 
+    
+    # print(len(targets))
     return input_query_label, input_query_bbox, attn_mask, dn_meta
 
 
