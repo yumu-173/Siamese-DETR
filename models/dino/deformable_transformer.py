@@ -345,13 +345,17 @@ class DeformableTransformer(nn.Module):
                 feat = self.pooling(image_feature.unsqueeze(dim=0)).reshape(1, -1) # 1 x C
                 feat_list.append(feat) 
             feat = torch.stack(feat_list, dim=0) # B x 1 x C
+            if i == 0:
+                template_feature = feat
+            else:
+                template_feature = torch.cat([template_feature, feat], 1)
             feat = feat.repeat(1, use_num_queries, 1)
             # print(feat.shape)
             if i == 0:
                 target = feat
             else:
                 target = torch.cat([target, feat], 1)
-        return target # B x L x C
+        return target, template_feature # B x L x C & B x 1 x C
     
     def init_tgt_embed_with_attpool(self, use_num_queries, template_features):
         for i, feature in enumerate(template_features):
@@ -484,7 +488,8 @@ class DeformableTransformer(nn.Module):
             if self.attn_pool:
                 tgt_ = self.init_tgt_embed_with_attpool(self.num_queries // self.template_lvl, template_features)
             else:
-                tgt_ = self.init_tgt_embed(self.num_queries // self.template_lvl, template_features, temp_masks, self.number_template)
+                tgt_, template_feature = self.init_tgt_embed(self.num_queries // self.template_lvl, template_features, temp_masks, self.number_template)
+                template_feature = template_feature / self.template_lvl
             #prepare for den
             tgt, refpoint_embed, attn_mask, dn_meta =\
                     prepare_for_sample_dn(dn_args=(targets, self.dn_number, self.dn_label_noise_ratio, self.dn_box_noise_scale),
@@ -592,7 +597,7 @@ class DeformableTransformer(nn.Module):
         # ref_enc: (n_enc+1, bs, nq, query_dim) or (1, bs, nq, query_dim) or (n_enc, bs, nq, d_model) or None
         #########################################################        
 
-        return hs, references, hs_enc, ref_enc, init_box_proposal, dn_meta
+        return hs, references, hs_enc, ref_enc, init_box_proposal, dn_meta, template_feature
         # hs: (n_dec, bs, nq, d_model)
         # references: sigmoid coordinates. (n_dec+1, bs, bq, 4)
         # hs_enc: (n_enc+1, bs, nq, d_model) or (1, bs, nq, d_model) or None

@@ -28,7 +28,7 @@ from util.slconfig import DictAction, SLConfig
 from util.utils import ModelEma, BestMetricHolder
 
 from bbox_adjust import bbox_adjustment
-
+from tools.tools.coco_categories import fitler_coco_category
 
 def get_args_parser():
     parser = argparse.ArgumentParser('Set transformer detector', add_help=False)
@@ -78,6 +78,8 @@ def get_args_parser():
     parser.add_argument('--temp_weight', type=bool, default=False, help='share template weight with image')
     parser.add_argument('--denoise_query', type=bool, default=False, help='change denoise query with template')
     parser.add_argument('--box_adjustment', type=bool, default=False, help='adjust fsc box')
+    parser.add_argument('--ov_coco', type=bool, default=False, help='remove some class in train')
+    parser.add_argument('--keep_template_look', type=bool, default=False, help='Use appearance features as a basis for classification so that the network retains appearance features')
     
     # distributed training parameters
     parser.add_argument('--world_size', default=1, type=int,
@@ -204,10 +206,13 @@ def main(args):
     optimizer = torch.optim.AdamW(param_dicts, lr=args.lr,
                                   weight_decay=args.weight_decay)
     
-
-    dataset_train = build_dataset(image_set='train', args=args)
-
-    dataset_val = build_dataset(image_set='val', args=args)
+    if args.ov_coco:
+        dataset_train = build_dataset(image_set='train_ov', args=args)
+        dataset_val = build_dataset(image_set='val_ov', args=args)
+    else:
+        dataset_train = build_dataset(image_set='train', args=args)
+        dataset_val = build_dataset(image_set='val', args=args)
+    
 
     if args.distributed:
         sampler_train = DistributedSampler(dataset_train)
@@ -459,6 +464,9 @@ if __name__ == '__main__':
     # args.eval = True
     # args.options = 'dn_scalar=100 embed_init_tgt=TRUE dn_label_coef=1.0 dn_bbox_coef=1.0 use_ema=False dn_box_noise_scale=1.0'
     print(args)
+    if args.ov_coco:
+        fitler_coco_category(args.coco_path, 'train')
+        fitler_coco_category(args.coco_path, 'val')
     if args.output_dir:
         Path(args.output_dir).mkdir(parents=True, exist_ok=True)
     main(args)

@@ -18,7 +18,9 @@ import math
 import random
 from typing import List
 import torch
+from torch.nn.parameter import Parameter
 import torch.nn.functional as F
+import torch.nn.init as init
 from torch import nn
 from torchvision.ops.boxes import nms
 import numpy as np
@@ -37,6 +39,33 @@ from .utils import sigmoid_focal_loss, MLP
 
 from ..registry import MODULE_BUILD_FUNCS
 from .dn_components import prepare_for_cdn,dn_post_process
+
+class ClassLinear(nn.Module):
+    def __init__(self, out_features: int, bias: bool = True,
+                 device=None, dtype=None) -> None:
+        factory_kwargs = {'device': device, 'dtype': dtype}
+        super().__init__()
+        self.out_features = out_features
+        self.pdist = nn.PairwiseDistance(p=2)
+        if bias:
+            self.bias = Parameter(torch.zeros(out_features, **factory_kwargs))
+        else:
+            self.register_parameter('bias', None)
+
+    def forward(self, hs, template_feature):
+        template_feature = torch.mean(template_feature, dim=1, keepdim=True)
+        # import pdb; pdb.set_trace()
+        template_feature = template_feature.repeat(1, hs.shape[1], 1) # B x N x D
+        pd = self.pdist(hs, template_feature)[:, :, None] # B x N x 1
+        pd = torch.cat([pd, -pd], dim=-1)
+        pd = pd + self.bias.view(1, 1, self.out_features)
+        return pd
+
+    def extra_repr(self) -> str:
+        return 'in_features={}, out_features={}, bias={}'.format(
+            self.in_features, self.out_features, self.bias is not None
+        )
+
 class DINO(nn.Module):
     """ This is the Cross-Attention Detector module that performs object detection """
     def __init__(self, backbone, transformer, num_classes, num_queries, 
@@ -63,6 +92,7 @@ class DINO(nn.Module):
                     denoise_query=False,
                     template_lvl=4,
                     number_template=1,
+                    keep_template_look=False
                     ):
         """ Initializes the model.
         Parameters:
@@ -89,6 +119,7 @@ class DINO(nn.Module):
         self.denoise_query = denoise_query
         self.template_lvl = template_lvl
         self.number_template = number_template
+        self.keep_template_look = keep_template_look
 
         # setting query dim
         self.query_dim = query_dim
@@ -182,7 +213,12 @@ class DINO(nn.Module):
         self.dec_pred_class_embed_share = dec_pred_class_embed_share
         self.dec_pred_bbox_embed_share = dec_pred_bbox_embed_share
         # prepare class & box embed
-        _class_embed = nn.Linear(hidden_dim, num_classes)
+        if self.keep_template_look:
+            print('class_embed is class_Linear')
+            _class_embed = ClassLinear(num_classes, bias=True)
+        else:
+            print('class_embed is nn.Linear')
+            _class_embed = nn.Linear(hidden_dim, num_classes)
         _bbox_embed = MLP(hidden_dim, hidden_dim, 4, 3)
         # init the two embed layers
         prior_prob = 0.01
@@ -422,7 +458,7 @@ class DINO(nn.Module):
         # print('srcs3:', srcs[3].shape)
         # --------------------------------------------------------------------------------------------------------------
         # hs, reference, hs_enc, ref_enc, init_box_proposal = self.transformer(srcs, masks, input_query_bbox, poss, input_query_label, temp_srcs, temp_masks, attn_mask)
-        hs, reference, hs_enc, ref_enc, init_box_proposal, dn_meta = self.transformer(srcs, masks, poss, temp_srcs, temp_masks, targets)
+        hs, reference, hs_enc, ref_enc, init_box_proposal, dn_meta, template_feature = self.transformer(srcs, masks, poss, temp_srcs, temp_masks, targets)
 
         # split output into batch
         if self.two_stage_type == 'standard':
@@ -457,8 +493,13 @@ class DINO(nn.Module):
 
 
         # outputs_class = self.class_embed(hs)
-        outputs_class = torch.stack([layer_cls_embed(layer_hs) for
-                                        layer_cls_embed, layer_hs in zip(self.class_embed, hs)])
+        if self.keep_template_look:
+            outputs_class = torch.stack([layer_cls_embed(layer_hs, template_feature) for
+                                            layer_cls_embed, layer_hs in zip(self.class_embed, hs)])
+        else:
+            outputs_class = torch.stack([layer_cls_embed(layer_hs) for
+                                            layer_cls_embed, layer_hs in zip(self.class_embed, hs)])
+        # import pdb; pdb.set_trace()
         if self.dn_number > 0 and dn_meta is not None:
             outputs_class, outputs_coord_list = \
                 dn_post_process(outputs_class, outputs_coord_list,
@@ -962,7 +1003,8 @@ def build_dino(args):
         temp_weight = args.temp_weight,
         denoise_query = args.denoise_query,
         template_lvl = args.template_lvl,
-        number_template = args.number_template
+        number_template = args.number_template,
+        keep_template_look = args.keep_template_look,
     )
     if args.masks:
         model = DETRsegm(model, freeze_detr=(args.frozen_weights is not None))

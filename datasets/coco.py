@@ -373,13 +373,14 @@ class CocoDetection(torchvision.datasets.CocoDetection):
             self.ids = sorted(self.ids)
             self.ids = self.ids[0:self.num_imgs]
 
+        ids1 = []
         for i in self.ids:
             target = self._load_target(i)
-            # if len(target) > 0:
-            #     ids1.append(i)
-            if len(target) == 0:
-                self.ids.remove(i)
-        # self.ids = ids1
+            if len(target) > 0:
+                ids1.append(i)
+            # if len(target) == 0:
+            #     self.ids.remove(i)
+        self.ids = ids1
 
     def change_hack_attr(self, hackclassname, attrkv_dict):
         target_class = dataset_hook_register[hackclassname]
@@ -476,7 +477,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
 
         # print('sample:', img.shape)
         # print('template:', template.shape)
-        return img, target, template
+        return img, target, [template]
     
     def getitem_train(self, idx):
         """
@@ -868,7 +869,7 @@ def make_coco_transforms(image_set, fix_size=False, strong_aug=False, args=None)
             normalize,
         ])
 
-    if image_set in ['val', 'eval_debug', 'train_adj', 'test']:
+    if image_set in ['val', 'eval_debug', 'train_adj', 'test', 'train_ov', 'val_ov']:
 
         if os.environ.get("GFLOPS_DEBUG_SHILONG", False) == 'INFO':
             print("Under debug mode for flops calculation only!!!!!!!!!!!!!!!!")
@@ -951,12 +952,16 @@ def build(image_set, args):
     mode = 'instances'
     gmot_root = '../gmot-main/data/COCO/'
     gmot_root = Path(gmot_root)
+    ov_root = 'ov_data/'
+    ov_root = Path(ov_root)
     PATHS = {
         "train": (root / 'train2017', root / "annotations" / f'{mode}_train2017.json'),
+        "train_ov": (root / 'train2017', ov_root / "annotations" / f'{mode}_ov_train2017.json'),
         "train_adj": (root, root / "annotations" / f'fsc_adj.json'),
         "test":(gmot_root, gmot_root / 'annotations' / 'gmot_test.json'),
         "train_reg": (root / "train2017", root / "annotations" / f'{mode}_train2017.json'),
         "val": (root / 'val2017', root / "annotations" / f'{mode}_val2017.json'),
+        "val_ov": (root / 'val2017', ov_root / "annotations" / f'{mode}_ov_val2017.json'),
         "eval_debug": (root / "val2017", root / "annotations" / f'{mode}_val2017.json'),
         # "test": (root / "test2017", root / "annotations" / 'image_info_test-dev2017.json' ),
     }

@@ -25,4 +25,4 @@ python -m torch.distributed.run --nproc_per_node=${GPUS} \
     --n_nodes ${NODE_COUNT} \
     --batch_size=2 \
     --output_dir $out_put_dir \
-    --keep_template_look True
+    --ov_coco True
