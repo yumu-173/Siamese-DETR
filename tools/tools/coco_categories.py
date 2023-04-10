@@ -17,6 +17,12 @@ def fitler_coco_category(coco_dir, image_set):
         if item['category_id'] in COCO_SEEN_LABELS:
             new_annotations.append(item)
     coco['annotations'] = new_annotations
+    
+    import os
+    if os.path.exists('ov_data/annotations/'):
+        pass
+    else:
+        os.makedirs('ov_data/annotations/')
 
     ov_anno_path = 'ov_data/annotations/instances_ov_' + image_set + '2017.json'
     total_json = json.dumps(coco, indent=2)
