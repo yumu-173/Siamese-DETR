@@ -2,6 +2,7 @@ _base_ = ['coco_transformer.py']
 
 num_classes = 2
 template_lvl = 4
+number_template = 2
 
 lr = 0.0001
 param_dict_type = 'default'
@@ -111,4 +112,3 @@ ema_decay = 0.9997
 ema_epoch = 0
 
 use_detached_boxes_dec_out = False
-
