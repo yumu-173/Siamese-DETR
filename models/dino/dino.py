@@ -311,7 +311,7 @@ class DINO(nn.Module):
         else:
             raise NotImplementedError('Unknown fix_refpoints_hw {}'.format(self.fix_refpoints_hw))
 
-    def forward(self, samples: NestedTensor, templates: NestedTensor, targets:List=None, temp_pos=None):
+    def forward(self, samples: NestedTensor, templates: NestedTensor, targets:List=None, track_pos=None):
         """ The forward expects a NestedTensor, which consists of:
                - samples.tensor: batched images, of shape [batch_size x 3 x H x W]
                - samples.mask: a binary mask of shape [batch_size x H x W], containing 1 on padded pixels
@@ -333,9 +333,11 @@ class DINO(nn.Module):
         template = []
         for template_list in templates:
             template.extend(template_list)
+        # import pdb; pdb.set_trace()
         templates = nested_tensor_from_tensor_list(template).to('cuda')
 
         temp_features, temp_poss = self.backbone(templates)
+        # import pdb; pdb.set_trace()
         features, poss = self.backbone(samples)
         # --------------------------------------------------------------------------------------------------------------
         # print('samples:', samples.shape)
@@ -428,7 +430,7 @@ class DINO(nn.Module):
                 if l == _len_srcs:
                     temp_src = self.temp_input_proj[l](temp_features[-1].tensors)
                 else:
-                    temp_src = self.temp_input_proj[l](srcs[-1])
+                    temp_src = self.temp_input_proj[l](temp_srcs[-1])
                 m = templates.mask
                 temp_mask = F.interpolate(m[None].float(), size=temp_src.shape[-2:]).to(torch.bool)[0]
                 temp_pos_l = self.backbone[1](NestedTensor(temp_src, temp_mask)).to(temp_src.dtype)
@@ -458,7 +460,7 @@ class DINO(nn.Module):
         # print('srcs3:', srcs[3].shape)
         # --------------------------------------------------------------------------------------------------------------
         # hs, reference, hs_enc, ref_enc, init_box_proposal = self.transformer(srcs, masks, input_query_bbox, poss, input_query_label, temp_srcs, temp_masks, attn_mask)
-        hs, reference, hs_enc, ref_enc, init_box_proposal, dn_meta, template_feature = self.transformer(srcs, masks, poss, temp_srcs, temp_masks, targets)
+        hs, reference, hs_enc, ref_enc, init_box_proposal, dn_meta, template_feature = self.transformer(srcs, masks, poss, temp_srcs, temp_masks, targets, track_pos)
 
         # split output into batch
         if self.two_stage_type == 'standard':
@@ -897,13 +899,14 @@ class PostProcess(nn.Module):
                           For evaluation, this must be the original image size (before any data augmentation)
                           For visualization, this should be the image size after data augment, but before padding
         """
-        num_select = self.num_select
+        # num_select = self.num_select
+        num_select = outputs['pred_logits'].shape[1]
         out_logits, out_bbox = outputs['pred_logits'], outputs['pred_boxes']
-        # import pdb; pdb.set_trace()
         assert len(out_logits) == len(target_sizes)
         assert target_sizes.shape[1] == 2
 
         prob = out_logits.sigmoid()
+        # topk_values, topk_indexes = torch.topk(prob.view(out_logits.shape[0], -1), num_select, dim=1)
         topk_values, topk_indexes = torch.topk(prob.view(out_logits.shape[0], -1), num_select, dim=1)
         scores = topk_values
         topk_boxes = topk_indexes // out_logits.shape[2]
@@ -917,11 +920,12 @@ class PostProcess(nn.Module):
             assert not not_to_xyxy
             boxes[:,:,2:] = boxes[:,:,2:] - boxes[:,:,:2]
         boxes = torch.gather(boxes, 1, topk_boxes.unsqueeze(-1).repeat(1,1,4))
-        
+        # import pdb; pdb.set_trace()
         # and from relative [0, 1] to absolute [0, height] coordinates
         img_h, img_w = target_sizes.unbind(1)
         scale_fct = torch.stack([img_w, img_h, img_w, img_h], dim=1)
         boxes = boxes * scale_fct[:, None, :]
+        # import pdb; pdb.set_trace()
 
         if self.nms_iou_threshold > 0:
             item_indices = [nms(b, s, iou_threshold=self.nms_iou_threshold) for b,s in zip(boxes, scores)]
@@ -929,8 +933,11 @@ class PostProcess(nn.Module):
             results = [{'scores': s[i], 'labels': l[i], 'boxes': b[i]} for s, l, b, i in zip(scores, labels, boxes, item_indices)]
         else:
             results = [{'scores': s, 'labels': l, 'boxes': b} for s, l, b in zip(scores, labels, boxes)]
-
-        return results
+        
+        if num_select < self.num_select:
+            return results, topk_boxes
+        else:
+            return results
 
 @MODULE_BUILD_FUNCS.registe_with_name(module_name='dino')
 def build_dino(args):
