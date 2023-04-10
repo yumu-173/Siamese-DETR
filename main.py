@@ -18,11 +18,12 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader, DistributedSampler
 import torch.distributed as dist
+from models.dino.tracker import Tracker
 
 import datasets
 import util.misc as utils
 from datasets import build_dataset, get_coco_api_from_dataset
-from engine import evaluate, train_one_epoch, test
+from engine import evaluate, train_one_epoch, test, track_test
 import models
 from util.slconfig import DictAction, SLConfig
 from util.utils import ModelEma, BestMetricHolder
@@ -80,7 +81,8 @@ def get_args_parser():
     parser.add_argument('--box_adjustment', type=bool, default=False, help='adjust fsc box')
     parser.add_argument('--ov_coco', type=bool, default=False, help='remove some class in train')
     parser.add_argument('--keep_template_look', type=bool, default=False, help='Use appearance features as a basis for classification so that the network retains appearance features')
-    
+    parser.add_argument('--test_track', default=False, action='store_true', help='test gmot with tracktor')
+
     # distributed training parameters
     parser.add_argument('--world_size', default=1, type=int,
                         help='number of distributed processes')
@@ -149,6 +151,8 @@ def main(args):
             raise ValueError("Key {} can used by args only".format(k))
 
     # update some new args temporally
+    if args.test or args.test_track:
+        args.number_template = 1
     if not getattr(args, 'use_ema', None):
         args.use_ema = False
     if not getattr(args, 'debug', None):
@@ -307,6 +311,18 @@ def main(args):
                                     collate_fn=utils.collate_fn, num_workers=args.num_workers)
         test_stats = test(model, criterion, postprocessors,
                                               data_loader_test, base_ds, device, args.output_dir, wo_class_error=wo_class_error, args=args)
+        return
+    
+    if args.test_track:
+        tracker = Tracker(model, args)
+        dataset_test = build_dataset(image_set='test_track', args=args)
+        # sampler_test = torch.utils.data.RandomSampler(dataset_test)
+        # batch_sampler_test = torch.utils.data.BatchSampler(sampler_test, args.batch_size, drop_last=True)
+        # data_loader_test = DataLoader(dataset_test, batch_sampler=batch_sampler_test,
+        #                             collate_fn=utils.collate_fn, num_workers=args.num_workers)
+        # import pdb; pdb.set_trace()
+        test_stats = track_test(model, criterion, postprocessors,
+                                              dataset_test, base_ds, device, args.output_dir, tracker, wo_class_error=wo_class_error, args=args)
         return
     
     if args.eval:

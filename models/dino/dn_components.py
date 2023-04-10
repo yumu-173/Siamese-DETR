@@ -325,8 +325,6 @@ def prepare_for_cdn(dn_args, training, num_queries, hidden_dim, label_enc, temp_
         # ****************************************************************************
         m = known_labels_expaned.long().to('cuda')
         input_label_embed = label_enc(m)
-        print('input_label_embed', input_label_embed.shape)
-        exit(0)
         input_bbox_embed = inverse_sigmoid(known_bbox_expand)
 
         padding_label = torch.zeros(pad_size, hidden_dim).cuda()

@@ -235,7 +235,7 @@ class RandomSelect(object):
 
 
 class ToTensor(object):
-    def __call__(self, img, target):
+    def __call__(self, img, target=None):
         return F.to_tensor(img), target
 
 
@@ -271,7 +271,7 @@ class Compose(object):
     def __init__(self, transforms):
         self.transforms = transforms
 
-    def __call__(self, image, target):
+    def __call__(self, image, target=None):
         for t in self.transforms:
             image, target = t(image, target)
         return image, target

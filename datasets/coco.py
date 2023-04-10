@@ -26,6 +26,8 @@ import datasets.transforms as T
 from util.box_ops import box_cxcywh_to_xyxy, box_iou
 from copy import deepcopy
 
+from .gmot_wrapper import GMOT40Wrapper
+
 __all__ = ['build']
 
 ######################################################
@@ -360,7 +362,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
                  num_imgs=None, number_template=None):
         super(CocoDetection, self).__init__(img_folder, ann_file)
         self._transforms = transforms
-        self.prepare = ConvertCocoPolysToMask(return_masks)
+        self.prepare = ConvertCocoPolysToMask(return_masks, image_set)
         self.aux_target_hacks = aux_target_hacks
         self.num_imgs = num_imgs
         self.class_dict = {}
@@ -455,7 +457,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
                     temp_image_id = self.class_dict[key]['template_img']
                     template_img = self._load_image(temp_image_id)
                     template = template_img.crop(box)
-                    cv2.imwrite('template/gmot/'+key+'.jpg', template)
+                    # cv2.imwrite('template/gmot/'+key+'.jpg', template)
                     self.template_list[key] = template
                 else:
                     template = self.template_list[key]
@@ -565,6 +567,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
                 temp_idx = random.choice(index_list)
                 index_list.remove(temp_idx)
                 template_class = temp_ann[temp_idx]['category_id']
+                # print('temp_idx:{},template_class:{}'.format(temp_idx, template_class))
                 new_img_id = random.choice(self.class_dict[template_class])
                 new_idx = self.ids.index(new_img_id)
                 new_img, new_img_target = super(CocoDetection, self).__getitem__(new_idx)
@@ -589,7 +592,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
                     targets_list.append(item)
 
             # print('targets_list:', len(targets_list))
-            # import pdb; pdb.set_trace()
+                # import pdb; pdb.set_trace()
         target = {'image_id': image_id, 'annotations': targets_list}
         # --------------------------------------------------------------------------------------------------------------
         img, target = self.prepare(img, target)
@@ -634,6 +637,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
                     new_t[key] = target[key]
             new_targets.append(new_t)
         target = new_targets
+        # import pdb; pdb.set_trace()
 
         return img, target, return_template_list, box
 
@@ -656,8 +660,9 @@ def convert_coco_poly_to_mask(segmentations, height, width):
 
 
 class ConvertCocoPolysToMask(object):
-    def __init__(self, return_masks=False):
+    def __init__(self, return_masks=False, image_set='train'):
         self.return_masks = return_masks
+        self.image_set = image_set
 
     def __call__(self, image, target):
         w, h = image.size
@@ -671,8 +676,9 @@ class ConvertCocoPolysToMask(object):
 
         boxes = [obj["bbox"] for obj in anno]
 
-        template = [obj["template_id"] for obj in anno]
-        template = torch.tensor(template, dtype=torch.int64)
+        if self.image_set == 'train':
+            template = [obj["template_id"] for obj in anno]
+            template = torch.tensor(template, dtype=torch.int64)
         # print('template_id', template)
         # guard against no boxes via resizing
         boxes = torch.as_tensor(boxes, dtype=torch.float32).reshape(-1, 4)
@@ -698,7 +704,8 @@ class ConvertCocoPolysToMask(object):
         keep = (boxes[:, 3] > boxes[:, 1]) & (boxes[:, 2] > boxes[:, 0])
         boxes = boxes[keep]
         classes = classes[keep]
-        template = template[keep]
+        if self.image_set == 'train':
+            template = template[keep]
         # import pdb; pdb.set_trace()
         if self.return_masks:
             masks = masks[keep]
@@ -711,7 +718,8 @@ class ConvertCocoPolysToMask(object):
         if self.return_masks:
             target["masks"] = masks
         target["image_id"] = image_id
-        target["template_id"] = template
+        if self.image_set == 'train':
+            target["template_id"] = template
         if keypoints is not None:
             target["keypoints"] = keypoints
 
@@ -959,6 +967,7 @@ def build(image_set, args):
         "train_ov": (root / 'train2017', ov_root / "annotations" / f'{mode}_ov_train2017.json'),
         "train_adj": (root, root / "annotations" / f'fsc_adj.json'),
         "test":(gmot_root, gmot_root / 'annotations' / 'gmot_test.json'),
+        "test_track":(gmot_root, gmot_root / 'annotations' / 'gmot_test.json'),
         "train_reg": (root / "train2017", root / "annotations" / f'{mode}_train2017.json'),
         "val": (root / 'val2017', root / "annotations" / f'{mode}_val2017.json'),
         "val_ov": (root / 'val2017', ov_root / "annotations" / f'{mode}_ov_val2017.json'),
@@ -980,22 +989,26 @@ def build(image_set, args):
         strong_aug = args.strong_aug
     except:
         strong_aug = False
-    dataset = CocoDetection(img_folder, ann_file,
-            transforms=make_coco_transforms(image_set, fix_size=args.fix_size, strong_aug=strong_aug, args=args), 
-            return_masks=args.masks,
-            image_set=image_set,
-            aux_target_hacks=aux_target_hacks_list,
-            number_template=args.number_template,
-            # num_imgs=100,
-        )
-    if image_set != 'test':
-        dataset.get_class_id_to_img_id()
-        print(dataset.class_dict.keys())
+    if image_set == 'test_track':
+        dataset = GMOT40Wrapper()
+        # import pdb; pdb.set_trace()
     else:
+        dataset = CocoDetection(img_folder, ann_file,
+                transforms=make_coco_transforms(image_set, fix_size=args.fix_size, strong_aug=strong_aug, args=args), 
+                return_masks=args.masks,
+                image_set=image_set,
+                aux_target_hacks=aux_target_hacks_list,
+                number_template=args.number_template,
+                # num_imgs=100,
+            )
+    if image_set == 'test':
         dataset.get_sequence_id_to_img_id()
         # print(dataset.class_dict)
-        # exit(0)
-    # exit(0)
+    elif image_set == 'test_track':
+        pass
+    else:
+        dataset.get_class_id_to_img_id()
+        print(dataset.class_dict.keys())
     return dataset
 
 
@@ -1017,6 +1030,6 @@ if __name__ == "__main__":
         )
     print('len(dataset_o365):', len(dataset_o365))
 
-    import ipdb; ipdb.set_trace()
+    import pdb; ipdb.set_trace()
 
     # ['/raid/liushilong/data/Objects365/train/patch16/objects365_v2_00908726.jpg', '/raid/liushilong/data/Objects365/train/patch6/objects365_v1_00320532.jpg', '/raid/liushilong/data/Objects365/train/patch6/objects365_v1_00320534.jpg']

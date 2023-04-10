@@ -12,6 +12,9 @@ from util.utils import slprint, to_device
 from util.nms_utils import cpu_nms, set_cpu_nms
 import numpy as np
 import torch
+from torch.utils.data import DataLoader
+import time
+import tqdm
 
 import util.misc as utils
 from datasets.coco_eval import CocoEvaluator
@@ -56,7 +59,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                 # import pdb; pdb.set_trace()
                 # print('poss:', temp_pos)
                 # ------------------------------------------------------------------------------------------------------
-                outputs, targets = model(samples, templates, targets, temp_pos)
+                outputs, targets = model(samples, templates, targets)
             else:
                 outputs, _ = model(samples)
             # import pdb; pdb.set_trace()
@@ -222,7 +225,7 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, out
             panoptic_evaluator.update(res_pano)
         
         if args.save_results:
-            # res_score = outputs['res_score']
+            # res_outputs['res_score']
             # res_label = outputs['res_label']
             # res_bbox = outputs['res_bbox']
             # res_idx = outputs['res_idx']
@@ -409,36 +412,115 @@ def test(model, criterion, postprocessors, data_loader, base_ds, device, output_
         import json
         with open(args.output_dir + f'/results{args.rank}.json', 'w') as f:
             json.dump(final_res, f)  
-        # with open(args.output_dir + f'/template{args.rank}.json', 'w') as f:
-        #     json.dump(template_box, f)      
-        
-    # gather the stats from all processes
-    # metric_logger.synchronize_between_processes()
-    # print("Averaged stats:", metric_logger)
-    # if coco_evaluator is not None:
-    #     coco_evaluator.synchronize_between_processes()
-    # if panoptic_evaluator is not None:
-    #     panoptic_evaluator.synchronize_between_processes()
+    return final_res
 
-    # # accumulate predictions from all images
-    # if coco_evaluator is not None:
-    #     coco_evaluator.accumulate()
-    #     coco_evaluator.summarize()
-        
-    # panoptic_res = None
-    # if panoptic_evaluator is not None:
-    #     panoptic_res = panoptic_evaluator.summarize()
-    # stats = {k: meter.global_avg for k, meter in metric_logger.meters.items() if meter.count > 0}
-    # if coco_evaluator is not None:
-    #     if 'bbox' in postprocessors.keys():
-    #         stats['coco_eval_bbox'] = coco_evaluator.coco_eval['bbox'].stats.tolist()
-    #     if 'segm' in postprocessors.keys():
-    #         stats['coco_eval_masks'] = coco_evaluator.coco_eval['segm'].stats.tolist()
-    # if panoptic_res is not None:
-    #     stats['PQ_all'] = panoptic_res["All"]
-    #     stats['PQ_th'] = panoptic_res["Things"]
-    #     stats['PQ_st'] = panoptic_res["Stuff"]
+score_dict = {
+    'airplane-3': 0.3,
+    'airplane-0': 0.18,
+    'airplane-1': 0.18,
+    'airplane-2': 0.3,
+    'bird-1': 0.25,
+    'bird-0': 0.2,
+    'bird-2': 0.25,
+    'bird-3': 0.3,
+    'person-3': 0.25,
+    'person-1': 0.25,
+    'person-2': 0.3,
+    'stock-3': 0.3,
+    'stock-2': 0.25,
+    'stock-1': 0.35,
+    'car-0': 0.25,
+    'car-1': 0.23,
+    'car-2': 0.18,
+    'car-3': 0.25,
+    # 'insect-3': 0.2,
+    'insect-2': 0.17,
+    # 'insect-1': 0.2,
+    'insect-0': 0.25,
+    'balloon-3': 0.17,
+    'balloon-2': 0.18,
+    'balloon-1': 0.15,
+    'balloon-0': 0.35,
+    # 'fish-3': 0.02,
+    # 'fish-2': 0.015,
+    # 'fish-1': 0.015,
+    'fish-0': 0.25,
+    # 'boat-3': 0.03,
+    # 'boat-2': 0.006,
+    # 'boat-1': 0.025,
+    # 'boat-0': 0.03,
+    'ball-3': 0.3,
+    'ball-0': 0.3,
+    # 'ball-2': 0.02,
+    'ball-1': 0.25,
+    # 'ball-0': 0.009,
+    'else': 0.21
+}
 
-    # import ipdb; ipdb.set_trace()
+@torch.no_grad()
+def track_test(model, criterion, postprocessors, dataset, base_ds, device, output_dir, tracker, wo_class_error=False, args=None, logger=None):
+    model.eval()
+    criterion.eval()
 
+    metric_logger = utils.MetricLogger(delimiter="  ")
+    # if not wo_class_error:
+    #     metric_logger.add_meter('class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
+    header = 'Test:'
+
+    iou_types = tuple(k for k in ('segm', 'bbox') if k in postprocessors.keys())
+    # coco_evaluator = CocoEvaluator(base_ds, iou_types)
+    # coco_evaluator.coco_eval[iou_types[0]].params.iouThrs = [0, 0.1, 0.5, 0.75]
+
+    for seq, template in dataset:
+        txt_name = 'results/' + str(seq) + '.txt'
+        with open(txt_name, 'w') as f:
+            f.close()
+        tracker.reset()
+        # import pdb;pdb.set_trace()
+        if str(seq) in score_dict.keys():
+            tracker.detection_person_thresh = score_dict[str(seq)]
+            # print(seq, tracker.detection_person_thresh)
+        else:
+            tracker.detection_person_thresh = score_dict['else']
+
+        time_total = 0
+        num_frames = 0
+
+        print(seq)
+        # metric_logger.add_meter('Track_seq', seq)
+        start_frame = int(tracker.frame_range['start'] * len(seq))
+        end_frame = int(tracker.frame_range['end'] * len(seq))
+        seq_loader = DataLoader(torch.utils.data.Subset(seq, range(start_frame, end_frame)))
+        # import pdb; pdb.set_trace()
+        num_frames += len(seq_loader)
+
+        start = time.time()
+
+        for frame_data in metric_logger.log_every(seq_loader, 10, header, logger=logger):
+            with torch.no_grad():
+                # import pdb; pdb.set_trace()
+                tracker.step(frame_data, template, postprocessors, seq.image_wh)
+
+        results = tracker.get_results()
+
+        for track_id in results.keys():
+            track = results[track_id]
+            for frame_id in track:
+                x, y, w, h, s = track[frame_id]
+                x = x - w/2
+                y = y - h/2
+                txt_name = 'results/' + str(seq) + '.txt'
+                with open(txt_name, 'a') as f:
+                    f.write(('%g,' * 6 + '-1,-1,-1,-1\n') % (frame_id, track_id, x,  # MOT format
+                                                       y, w, h))
+
+        time_total += time.time() - start
+        print('Run time for {} use {}s'.format(seq, time_total))
+        # import pdb; pdb.set_trace()
+    final_res = []
+    
+    if args.output_dir:
+        import json
+        with open(args.output_dir + f'/results{args.rank}.json', 'w') as f:
+            json.dump(final_res, f)  
     return final_res

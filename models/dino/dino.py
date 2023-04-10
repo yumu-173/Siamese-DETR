@@ -422,7 +422,7 @@ class DINO(nn.Module):
                 masks.append(mask)
                 poss.append(pos_l)
                 
-        # import pdb; pdb.set_trace()
+        import pdb; pdb.set_trace()
         if self.template_lvl == 4 and self.num_feature_levels > len(temp_srcs):
             _len_srcs = len(temp_srcs)
             # print('_len_srcs', _len_srcs)
