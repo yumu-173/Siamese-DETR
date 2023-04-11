@@ -114,7 +114,7 @@ class DINO(nn.Module):
         self.hidden_dim = hidden_dim = transformer.d_model
         self.num_feature_levels = num_feature_levels
         self.nheads = nheads
-        self.label_enc = nn.Embedding(dn_labelbook_size + 1, hidden_dim)
+        # self.label_enc = nn.Embedding(dn_labelbook_size + 1, hidden_dim)
         self.share_weight = temp_weight
         self.denoise_query = denoise_query
         self.template_lvl = template_lvl
@@ -422,7 +422,7 @@ class DINO(nn.Module):
                 masks.append(mask)
                 poss.append(pos_l)
                 
-        import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
         if self.template_lvl == 4 and self.num_feature_levels > len(temp_srcs):
             _len_srcs = len(temp_srcs)
             # print('_len_srcs', _len_srcs)
@@ -436,9 +436,7 @@ class DINO(nn.Module):
                 temp_pos_l = self.backbone[1](NestedTensor(temp_src, temp_mask)).to(temp_src.dtype)
                 temp_srcs.append(temp_src)
                 temp_masks.append(temp_mask)
-                temp_poss.append(temp_pos_l)
-
-
+                temp_poss.append(temp_pos_l) 
         # if self.dn_number > 0 and targets is not None:
         #     input_query_label, input_query_bbox, attn_mask, dn_meta =\
         #         prepare_for_cdn(dn_args=(targets, self.dn_number, self.dn_label_noise_ratio, self.dn_box_noise_scale),
@@ -481,7 +479,7 @@ class DINO(nn.Module):
         reference = split_reference
         # import pdb; pdb.set_trace()
         # In case num object=0
-        hs[0] += self.label_enc.weight[0, 0] * 0.0
+        # hs[0] += self.label_enc.weight[0, 0] * 0.0
 
         # deformable-detr-like anchor update
         # reference_before_sigmoid = inverse_sigmoid(reference[:-1]) # n_dec, bs, nq, 4

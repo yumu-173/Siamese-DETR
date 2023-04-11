@@ -82,6 +82,7 @@ def get_args_parser():
     parser.add_argument('--ov_coco', type=bool, default=False, help='remove some class in train')
     parser.add_argument('--keep_template_look', type=bool, default=False, help='Use appearance features as a basis for classification so that the network retains appearance features')
     parser.add_argument('--test_track', default=False, action='store_true', help='test gmot with tracktor')
+    parser.add_argument('--dn_type', default='sample', help='you can chose dsn, dn and no dn')
 
     # distributed training parameters
     parser.add_argument('--world_size', default=1, type=int,

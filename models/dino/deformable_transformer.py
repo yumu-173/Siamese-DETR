@@ -22,7 +22,7 @@ from torch import nn, Tensor
 
 from .utils import gen_encoder_output_proposals, MLP,_get_activation_fn, gen_sineembed_for_position
 from .ops.modules import MSDeformAttn
-from .dn_components import prepare_for_sample_dn
+from .dn_components import prepare_for_sample_dn, prepare_for_cdn
 
 class AttentionPool2d(nn.Module):
     def __init__(self, spacial_dim: int, embed_dim: int, num_heads: int, output_dim: int = None):
@@ -113,10 +113,12 @@ class DeformableTransformer(nn.Module):
                  template_lvl=4,
                  number_template=2,
                  # for dn
+                 dn_type = 'sample',
                  dn_number = 100,
                  dn_box_noise_scale = 0.4,
                  dn_label_noise_ratio = 0.5,
                  dn_labelbook_size = 100,
+                 num_classes = 2,
                  ):
         super().__init__()
         self.attn_pool = attn_pool
@@ -135,11 +137,15 @@ class DeformableTransformer(nn.Module):
         assert query_dim == 4
 
         # for dn training
+        self.dn_type = dn_type
         self.num_patterns = num_patterns
         self.dn_number = dn_number
         self.dn_box_noise_scale = dn_box_noise_scale
         self.dn_label_noise_ratio = dn_label_noise_ratio
         self.dn_labelbook_size = dn_labelbook_size
+        self.num_classes = num_classes
+        if self.dn_type == 'origin':
+            self.label_enc = nn.Embedding(dn_labelbook_size + 1, d_model)
 
         self.pooling = nn.AdaptiveAvgPool2d(1).cuda()
         if self.attn_pool:
@@ -490,10 +496,20 @@ class DeformableTransformer(nn.Module):
             else:
                 tgt_, template_feature = self.init_tgt_embed(self.num_queries // self.template_lvl, template_features, temp_masks, self.number_template)
                 template_feature = template_feature / self.template_lvl
-            #prepare for dsn
-            tgt, refpoint_embed, attn_mask, dn_meta =\
-                    prepare_for_sample_dn(dn_args=(targets, self.dn_number, self.dn_label_noise_ratio, self.dn_box_noise_scale),
-                                            training=self.training, num_queries=self.num_queries, hidden_dim=self.d_model, query_label=tgt_)
+            if self.dn_type == 'sample':
+                #prepare for dsn
+                tgt, refpoint_embed, attn_mask, dn_meta =\
+                        prepare_for_sample_dn(dn_args=(targets, self.dn_number, self.dn_label_noise_ratio, self.dn_box_noise_scale),
+                                                training=self.training, num_queries=self.num_queries, hidden_dim=self.d_model, query_label=tgt_)
+            elif self.dn_type == 'origin':
+                tgt, refpoint_embed, attn_mask, dn_meta =\
+                    prepare_for_cdn(dn_args=(targets, self.dn_number, self.dn_label_noise_ratio, self.dn_box_noise_scale),
+                                    training=self.training,num_queries=self.num_queries,num_classes=self.num_classes,
+                                    hidden_dim=self.d_model,label_enc=self.label_enc)
+            else:
+                tgt = refpoint_embed = dn_meta = None
+                attn_mask = torch.zeros((self.num_queries, self.num_queries), dtype=torch.bool).cuda()
+            # import pdb; pdb.set_trace()
             # import pdb; pdb.set_trace()
             # tgt_ = self.tgt_embed.weight[:, None, :].repeat(1, bs, 1).transpose(0, 1) # nq, bs, d_model
             
@@ -1289,10 +1305,12 @@ def build_deformable_transformer(args):
         use_detached_boxes_dec_out=use_detached_boxes_dec_out,
 
         # dn
+        dn_type = args.dn_type,
         dn_number = args.dn_number,
         dn_box_noise_scale = args.dn_box_noise_scale,
         dn_label_noise_ratio = args.dn_label_noise_ratio,
         dn_labelbook_size = args.dn_labelbook_size,
+        num_classes = args.num_classes,
     )
 
 

@@ -493,7 +493,7 @@ class Tracker:
             os.mkdir(seq)
         img_name = seq + '/' + path.split('/')[-1]
         cv2.imwrite(img_name, img)
-        import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
 
     def get_results(self):
         return self.results

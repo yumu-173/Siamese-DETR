@@ -170,7 +170,7 @@ def prepare_for_sample_dn(dn_args, training, num_queries, hidden_dim, query_labe
     return input_query_label, input_query_bbox, attn_mask, dn_meta
 
 
-def prepare_for_cdn(dn_args, training, num_queries, hidden_dim, label_enc, temp_pos, denoise_query):
+def prepare_for_cdn(dn_args, training, num_queries, num_classes, hidden_dim, label_enc):
     """
         A major difference of DINO from DN-DETR is that the author process pattern embedding pattern embedding in its detector
         forward function and use learnable tgt embedding, so we change this function a little bit.
@@ -186,8 +186,7 @@ def prepare_for_cdn(dn_args, training, num_queries, hidden_dim, label_enc, temp_
         targets, dn_number, label_noise_ratio, box_noise_scale = dn_args
         # positive and negative dn queries
         dn_number = dn_number * 2
-        
-        # limit dn_number < query_num/2
+
         targets_list = []
         for t in targets:
             if len(t['labels']) > num_queries/4:
@@ -200,10 +199,9 @@ def prepare_for_cdn(dn_args, training, num_queries, hidden_dim, label_enc, temp_
                 t['boxes_dn'] = t['boxes']
             targets_list.append(t)
         targets = targets_list
-        
-        known = [(torch.ones_like(t['labels'])).cuda() for t in targets]
+
+        known = [(torch.ones_like(t['labels_dn'])).cuda() for t in targets]
         batch_size = len(known)
-        # print('batch_szie:', batch_size)
         known_num = [sum(k) for k in known]
         if int(max(known_num)) == 0:
             dn_number = 1
@@ -215,67 +213,9 @@ def prepare_for_cdn(dn_args, training, num_queries, hidden_dim, label_enc, temp_
         if dn_number == 0:
             dn_number = 1
         unmask_bbox = unmask_label = torch.cat(known)
-        labels = torch.cat([t['labels'] for t in targets])
-        boxes = torch.cat([t['boxes'] for t in targets])
-        # print("boxes:", boxes)
-        if denoise_query:
-            # negative query -----------------------------------------------------------------------------------------------
-            image_crop = random_crop()
-            # boxs = torch.cat([t['boxes'] for t in targets])
-            boxs_ = torch.zeros_like(boxes)
-            boxs_[:, :2] = boxes[:, :2] - boxes[:, 2:] / 2
-            boxs_[:, 2:] = boxes[:, :2] + boxes[:, 2:] / 2
-            # print("boxs:", boxs_.shape)
-            # print("image_crop:", image_crop[0])
-            if boxes.shape[0] != 0:
-                IOU = torchvision.ops.box_iou(image_crop, boxs_)
-                # print('IOU:', IOU)
-                # print('IOU SHAPE:', IOU.shape)
-                max_IOU = torch.max(IOU, dim=1)
-                max_iou = max_IOU[0]
-                # max_iou = torch.nonzero(max_IOU[0])
-                # print('iou:', max_iou)
-                iou_thr = random.randint(1, 3)
-                negative_id = 0
-                for i, item in enumerate(max_iou):
-                    if item > 0 and item < 0.1 and iou_thr == 1:
-                        negative_id = i
-                        break
-                    elif item > 0.1 and item < 0.2 and iou_thr == 2:
-                        negative_id = i
-                        break
-                    elif item > 0.2 and item < 0.3 and iou_thr == 3:
-                        negative_id = i
-                        break
-                negative_emb = image_crop[negative_id]
-            else:
-                negative_emb = image_crop[0]
-            # print('iou:', max_iou[negative_id])
-            # print('negative_emb:', negative_emb)
-            # positive query -----------------------------------------------------------------------------------------------
-            # print('tempid:', temp_id)
-            box_list = []
-            label_list = []
-            # print('len target:', targets)
-            for i, t in enumerate(targets):
-                # print('i:', i)
-                label = torch.zeros(1, dtype=torch.int64).repeat(len(t['labels'])).cuda()
-                # print('temp_pos:', temp_pos[i])
-                box = torch.Tensor([temp_pos[i][0]/t['orig_size'][0], temp_pos[i][1]/t['orig_size'][1], temp_pos[i][2]/t['orig_size'][0], temp_pos[i][3]/t['orig_size'][1]]) \
-                                        [None, :].repeat(len(t['boxes']), 1).cuda()
-                # print('box:', box[0])
-                box_list.append(box)
-                label_list.append(label)
-            boxes = torch.cat(box_list, dim=0)
-            labels = torch.cat(label_list, dim=0)
-            # print('boxes1:', boxes)
-            # print('labels', labels.shape)
-            # print('labels', labels)
-            # --------------------------------------------------------------------------------------------------------------
-        
-        batch_idx = torch.cat([torch.full_like(t['labels'].long(), i) for i, t in enumerate(targets)])
-        # print('batch_idx:', batch_idx.shape)
-            
+        labels = torch.cat([t['labels_dn'] for t in targets])
+        boxes = torch.cat([t['boxes_dn'] for t in targets])
+        batch_idx = torch.cat([torch.full_like(t['labels_dn'].long(), i) for i, t in enumerate(targets)])
 
         known_indice = torch.nonzero(unmask_label + unmask_bbox)
         known_indice = known_indice.view(-1)
@@ -290,8 +230,7 @@ def prepare_for_cdn(dn_args, training, num_queries, hidden_dim, label_enc, temp_
         if label_noise_ratio > 0:
             p = torch.rand_like(known_labels_expaned.float())
             chosen_indice = torch.nonzero(p < (label_noise_ratio * 0.5)).view(-1)  # half of bbox prob
-            # new_label = torch.randint_like(chosen_indice, 0, num_classes)  # randomly put a new one here
-            new_label = torch.ones_like(chosen_indice)
+            new_label = torch.randint_like(chosen_indice, 0, num_classes)  # randomly put a new one here
             known_labels_expaned.scatter_(0, chosen_indice, new_label)
         single_pad = int(max(known_num))
 
@@ -319,10 +258,6 @@ def prepare_for_cdn(dn_args, training, num_queries, hidden_dim, label_enc, temp_
             known_bbox_expand[:, :2] = (known_bbox_[:, :2] + known_bbox_[:, 2:]) / 2
             known_bbox_expand[:, 2:] = known_bbox_[:, 2:] - known_bbox_[:, :2]
 
-        # change box *****************************************************************
-        if denoise_query:
-            known_bbox_expand[chosen_indice] = negative_emb
-        # ****************************************************************************
         m = known_labels_expaned.long().to('cuda')
         input_label_embed = label_enc(m)
         input_bbox_embed = inverse_sigmoid(known_bbox_expand)
@@ -367,7 +302,6 @@ def prepare_for_cdn(dn_args, training, num_queries, hidden_dim, label_enc, temp_
         dn_meta = None
 
     return input_query_label, input_query_bbox, attn_mask, dn_meta
-
 
 def dn_post_process(outputs_class, outputs_coord, dn_meta, aux_loss, _set_aux_loss):
     """

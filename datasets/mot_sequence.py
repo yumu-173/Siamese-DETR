@@ -87,7 +87,7 @@ class MOTSequence(Dataset):
         image_id = next(x for x in images if x["file_name"] == template_image_name)['id']
         template_annos = list(filter(lambda item: item['image_id'] == image_id, annotations))
         # template_anno = random.choices(template_annos)
-        if self._seq_name == 'stock-0':
+        if self._seq_name in  ['stock-0', 'balloon-0', 'fish-2', 'ball-2']:
             template_anno = [template_annos[1]]
         else:
             template_anno = [template_annos[int(len(template_annos)/2)-2]]
@@ -109,6 +109,15 @@ class MOTSequence(Dataset):
             T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
         ])
         template, _ = tran_template(template, target=None)
+        # vis template feature
+        from torchvision import transforms
+        unloader = transforms.ToPILImage()
+        image = template.cpu().clone()  # clone the tensor
+        image = image.squeeze(0)  # remove the fake batch dimension
+        image = unloader(image)
+        name = 'track_vis/example_' + self._seq_name + '.jpg'
+        image.save(name)
+
         gt_file = osp.join(seq_path, 'gt', 'gt.txt')
 
         total = []
