@@ -15,6 +15,7 @@ import torch
 from torch.utils.data import DataLoader
 import time
 import tqdm
+import cv2
 
 import util.misc as utils
 from datasets.coco_eval import CocoEvaluator
@@ -345,7 +346,7 @@ def test(model, criterion, postprocessors, data_loader, base_ds, device, output_
     for samples, targets, templates in metric_logger.log_every(data_loader, 10, header, logger=logger):
         samples = samples.to(device)
         # print('sample:', samples.shape)
-        # import ipdb; ipdb.set_trace()
+        # import pdb; pdb.set_trace()
         # targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
         targets = [{k: to_device(v, device) for k, v in t.items()} for t in targets]
 
@@ -523,4 +524,120 @@ def track_test(model, criterion, postprocessors, dataset, base_ds, device, outpu
         import json
         with open(args.output_dir + f'/results{args.rank}.json', 'w') as f:
             json.dump(final_res, f)  
+    return final_res
+
+class_dict = {"1": "person", "2": "bicycle", "3": "car", "4": "motorcycle", 
+              "5": "airplane", "6": "bus","7": "train","8": "truck", 
+              "9": "boat","10": "traffic light","11": "fire hydrant","13": "stop sign", 
+              "14": "parking meter","15": "bench","16": "bird","17": "cat", 
+              "18": "dog","19": "horse","20": "sheep","21": "cow", 
+              "22": "elephant","23": "bear","24": "zebra","25": "giraffe", 
+              "27": "backpack","28": "umbrella","31": "handbag","32": "tie", 
+              "33": "suitcase", "34": "frisbee", "35": "skis", "36": "snowboard", 
+              "37": "sports ball", "38": "kite", "39": "baseball bat", "40": "baseball glove", 
+              "41": "skateboard", "42": "surfboard", "43": "tennis racket", "44": "bottle", 
+              "46": "wine glass", "47": "cup", "48": "fork", "49": "knife", 
+              "50": "spoon", "51": "bowl", "52": "banana", "53": "apple", 
+              "54": "sandwich", "55": "orange", "56": "broccoli", "57": "carrot", 
+              "58": "hot dog", "59": "pizza", "60": "donut", "61": "cake", 
+              "62": "chair", "63": "couch", "64": "potted plant", "65": "bed", 
+              "67": "dining table", "70": "toilet", "72": "tv", "73": "laptop", 
+              "74": "mouse", "75": "remote", "76": "keyboard", "77": "cell phone", 
+              "78": "microwave", "79": "oven", "80": "toaster", "81": "sink", 
+              "82": "refrigerator", "84": "book", "85": "clock", "86": "vase", 
+              "87": "scissors", "88": "teddy bear", "89": "hair drier", "90": "toothbrush"}
+@torch.no_grad()
+def ov_test(model, criterion, postprocessors, dataset, data_loader, base_ds, device, output_dir, wo_class_error=False, args=None, logger=None):
+    model.eval()
+    criterion.eval()
+    # coco_evaluator = CocoEvaluator(base_ds, iou_types, useCats=useCats)
+
+    metric_logger = utils.MetricLogger(delimiter="  ")
+    # if not wo_class_error:
+    #     metric_logger.add_meter('class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
+    header = 'Test:'
+
+    iou_types = tuple(k for k in ('segm', 'bbox') if k in postprocessors.keys())
+    # coco_evaluator = CocoEvaluator(base_ds, iou_types)
+    # coco_evaluator.coco_eval[iou_types[0]].params.iouThrs = [0, 0.1, 0.5, 0.75]
+
+    panoptic_evaluator = None
+    if 'panoptic' in postprocessors.keys():
+        panoptic_evaluator = PanopticEvaluator(
+            data_loader.dataset.ann_file,
+            data_loader.dataset.ann_folder,
+            output_dir=os.path.join(output_dir, "panoptic_eval"),
+        )
+
+    final_res = []
+    template_box = {}
+    i = 1
+    for key in dataset.template_list.keys():
+        # key = 1
+        print('No.' + str(i), end=' ')
+        i += 1
+        print('Testing class ' + class_dict[str(key)])
+        for samples, targets in metric_logger.log_every(data_loader, 10, header, logger=logger):
+            samples = samples.to(device)
+            targets = [{k: to_device(v, device) for k, v in t.items()} for t in targets]
+            templates = [dataset.template_list[key]]
+            # import pdb; pdb.set_trace()
+            outputs, _ = model(samples, templates)
+
+            orig_target_sizes = torch.stack([t["orig_size"] for t in targets], dim=0)
+            results = postprocessors['bbox'](outputs, orig_target_sizes, not_to_xyxy=True)
+            # [scores: [100], labels: [100], boxes: [100, 4]] x B
+            if 'segm' in postprocessors.keys():
+                target_sizes = torch.stack([t["size"] for t in targets], dim=0)
+                results = postprocessors['segm'](results, outputs, orig_target_sizes, target_sizes)
+            res = {target['image_id'].item(): output for target, output in zip(targets, results)}
+
+            for image_id, outputs in res.items():
+                _scores = outputs['scores']
+                _labels = outputs['labels']
+                _boxes = outputs['boxes']
+                class_keep = _labels.bool()
+                _scores = _scores[class_keep]
+                _labels = _labels[class_keep]
+                _boxes = _boxes[class_keep]
+                # ------------------ NMS -----------------------
+                box = torch.zeros_like(_boxes)
+                box[:, :2] = _boxes[:, :2] - (_boxes[:, 2:] / 2)
+                box[:, 2:] = _boxes[:, :2] + (_boxes[:, 2:] / 2)
+                keep = torchvision.ops.nms(box, _scores, 0.5)
+                _boxes = _boxes[keep].tolist()
+                _labels = _labels[keep].tolist()
+                _scores = _scores[keep].tolist()
+                # ----------------------------------------------
+                for s, l, b in zip(_scores, _labels, _boxes):
+                    assert isinstance(l, int)
+                    itemdict = {
+                            "image_id": int(image_id), 
+                            "category_id": l*key, 
+                            "bbox": b, 
+                            "score": s,
+                            }
+                    final_res.append(itemdict)
+                visual_result = True
+                if visual_result:
+                    image_path = '../dataset/COCO/val2017/' + str(image_id).rjust(12, '0') + '.jpg'
+                    img = cv2.imread(image_path, 1)
+                    for i, box in enumerate(_boxes):
+                        if _scores[i] > 0.25:
+                            cv2.rectangle(img, (int(box[0]-box[2]/2), int(box[1]-box[3]/2)), (int(box[2]/2+box[0]), int(box[3]/2+box[1])), (0, 255, 0), 2)
+                    save_path = 'ov_vis/vis/' + str(image_id).rjust(12, '0') + '.jpg'
+                    cv2.imwrite(save_path, img)
+                    # from torchvision import transforms
+                    # unloader = transforms.ToPILImage()
+                    # image = dataset.template_list[key][0].cpu().clone()  # clone the tensor
+                    # image = image.squeeze(0)  # remove the fake batch dimension
+                    # image = unloader(image)
+                    # name = 'ov_vis/example_' + str(key) + '.jpg'
+                    # image.save(name)
+
+        if args.output_dir:
+            import json
+            with open(args.output_dir + f'/results_class{key}.json', 'w') as f:
+                json.dump(final_res, f, indent=2)
+        import pdb; pdb.set_trace()
     return final_res

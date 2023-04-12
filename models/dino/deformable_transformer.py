@@ -85,6 +85,7 @@ class DeformableTransformer(nn.Module):
                  add_channel_attention=False,
                  add_pos_value=False,
                  random_refpoints_xy=False,
+                 batch_size=2,
                  # two stage
                  two_stage_type='no', # ['no', 'standard', 'early', 'combine', 'enceachlayer', 'enclayer1']
                  two_stage_pat_embed=0,
@@ -119,6 +120,8 @@ class DeformableTransformer(nn.Module):
                  dn_label_noise_ratio = 0.5,
                  dn_labelbook_size = 100,
                  num_classes = 2,
+                 #for ov test
+                 test_ov=False
                  ):
         super().__init__()
         self.attn_pool = attn_pool
@@ -147,6 +150,8 @@ class DeformableTransformer(nn.Module):
         if self.dn_type == 'origin':
             self.label_enc = nn.Embedding(dn_labelbook_size + 1, d_model)
 
+        self.test_ov = test_ov
+        self.batch_size = batch_size
         self.pooling = nn.AdaptiveAvgPool2d(1).cuda()
         if self.attn_pool:
             self.attnpool = AttentionPool2d(16, d_model, nhead, d_model)
@@ -351,6 +356,10 @@ class DeformableTransformer(nn.Module):
                 feat = self.pooling(image_feature.unsqueeze(dim=0)).reshape(1, -1) # 1 x C
                 feat_list.append(feat) 
             feat = torch.stack(feat_list, dim=0) # B x 1 x C
+            if self.test_ov:
+                feat = torch.mean(feat, dim=0, keepdim=True)
+                # import pdb; pdb.set_trace()
+                feat = feat.repeat(self.batch_size, 1, 1)
             if i == 0:
                 template_feature = feat
             else:
@@ -1282,6 +1291,7 @@ def build_deformable_transformer(args):
         add_channel_attention=args.add_channel_attention,
         add_pos_value=args.add_pos_value,
         random_refpoints_xy=args.random_refpoints_xy,
+        batch_size=args.batch_size,
         attn_pool=args.attnpool,
         template_lvl=args.template_lvl,
         number_template=args.number_template,
@@ -1311,6 +1321,9 @@ def build_deformable_transformer(args):
         dn_label_noise_ratio = args.dn_label_noise_ratio,
         dn_labelbook_size = args.dn_labelbook_size,
         num_classes = args.num_classes,
+
+        # ov test
+        test_ov = args.test_ov,
     )
 
 

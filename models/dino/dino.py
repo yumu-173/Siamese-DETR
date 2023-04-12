@@ -114,7 +114,7 @@ class DINO(nn.Module):
         self.hidden_dim = hidden_dim = transformer.d_model
         self.num_feature_levels = num_feature_levels
         self.nheads = nheads
-        # self.label_enc = nn.Embedding(dn_labelbook_size + 1, hidden_dim)
+        self.label_enc = nn.Embedding(dn_labelbook_size + 1, hidden_dim)
         self.share_weight = temp_weight
         self.denoise_query = denoise_query
         self.template_lvl = template_lvl
@@ -479,7 +479,7 @@ class DINO(nn.Module):
         reference = split_reference
         # import pdb; pdb.set_trace()
         # In case num object=0
-        # hs[0] += self.label_enc.weight[0, 0] * 0.0
+        hs[0] += self.label_enc.weight[0, 0] * 0.0
 
         # deformable-detr-like anchor update
         # reference_before_sigmoid = inverse_sigmoid(reference[:-1]) # n_dec, bs, nq, 4
