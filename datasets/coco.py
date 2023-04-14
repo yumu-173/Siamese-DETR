@@ -1073,7 +1073,7 @@ def build(image_set, args):
         pass
     elif image_set == 'train':
         dataset.get_class_id_to_img_id()
-        dataset.get_ov_template()
+        # dataset.get_ov_template()
         # import pdb; pdb.set_trace()
     else:
         dataset.get_class_id_to_img_id()
