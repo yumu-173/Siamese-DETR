@@ -406,6 +406,8 @@ class CocoDetection(torchvision.datasets.CocoDetection):
                     self.class_dict[category_id] = [i]
                 else:
                     self.class_dict[category_id].append(i)
+        for category in self.class_dict.keys():
+            self.class_dict[category] = list(set(self.class_dict[category]))
 
     def get_sequence_id_to_img_id(self):
         for i in self.ids:
@@ -436,7 +438,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
                 # import pdb; pdb.set_trace()
                 for item in target:
                     if item['category_id'] == key and item['bbox'][2] > 25 and item['bbox'][3] > 25:
-                        box = item['bbox']
+                        box = deepcopy(item['bbox'])
                         box[2] += box[0]
                         box[3] += box[1]
                         template = img.crop(box)
@@ -458,6 +460,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
                         image.save(name)
                         templates.append(template)
                         # self.template_list[key] = [template]
+                        # import pdb; pdb.set_trace()
                         break
                     else:
                         pass
@@ -564,6 +567,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         image_id = self.ids[idx]
         # print('template image id:', image_id)
         target = {'image_id': image_id, 'annotations': target}
+        # import pdb; pdb.set_trace()
         # --------------------------------------------------------------------------------------------------------------
         # print(img)
         # print('getitem-target:', target['image_id'])
@@ -585,7 +589,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
                     temp_idx = np.random.randint(0, num - 1)
                     choise_num += 1
             template_class = target['annotations'][temp_idx]['category_id']
-            box = target['annotations'][temp_idx]['bbox']
+            box = deepcopy(target['annotations'][temp_idx]['bbox'])
             # print(box)
             
             box[2] = box[0] + max(1, box[2])
@@ -636,13 +640,20 @@ class CocoDetection(torchvision.datasets.CocoDetection):
                 new_img, new_img_target = super(CocoDetection, self).__getitem__(new_idx)
                 template_anno = list(filter(lambda item: item['category_id'] == template_class, new_img_target))
                 if len(template_anno) > 1:
-                    box = template_anno[np.random.randint(0, max(len(template_anno) - 1, 0))]['bbox']
+                    box = deepcopy(template_anno[np.random.randint(0, max(len(template_anno) - 1, 0))]['bbox'])
+                    # box = template_anno[np.random.randint(0, max(len(template_anno) - 1, 0))]['bbox']
                 else:
-                    box = template_anno[0]['bbox']
+                    box = deepcopy(template_anno[0]['bbox'])
+                    # box = template_anno[0]['bbox']
                 box[2] = box[0] + max(1, box[2])
                 box[3] = box[1] + max(box[3], 1)
                 template = new_img.crop(box)
+                # template_show = False
+                # if template_show:
+                #     template_path = 'template/coco/template_' + str(_) + '.jpg'
+                #     template.save(template_path)
                 template_list.append(template)
+                # import pdb; pdb.set_trace()
                 # change target
                 target_2class = deepcopy(target['annotations'])
                 for item in target_2class:
@@ -655,10 +666,11 @@ class CocoDetection(torchvision.datasets.CocoDetection):
                     targets_list.append(item)
 
             # print('targets_list:', len(targets_list))
-                # import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
         target = {'image_id': image_id, 'annotations': targets_list}
         # --------------------------------------------------------------------------------------------------------------
         img, target = self.prepare(img, target)
+        # import pdb; pdb.set_trace()
         # print('target:', target)
         # exit(0)
         if self._transforms is not None:
@@ -1073,7 +1085,7 @@ def build(image_set, args):
         pass
     elif image_set == 'train':
         dataset.get_class_id_to_img_id()
-        # dataset.get_ov_template()
+        dataset.get_ov_template()
         # import pdb; pdb.set_trace()
     else:
         dataset.get_class_id_to_img_id()

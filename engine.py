@@ -51,6 +51,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
             merge_targets.extend(target_list)
         targets = merge_targets 
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
+        # import pdb; pdb.set_trace()
         # print('enter', targets[0]['boxes'].shape)
 
         with torch.cuda.amp.autocast(enabled=args.amp):
@@ -574,6 +575,7 @@ def ov_test(model, criterion, postprocessors, dataset, data_loader, base_ds, dev
     i = 1
     for key in dataset.template_list.keys():
         # key = 1
+        class_results = []
         print('No.' + str(i), end=' ')
         i += 1
         print('Testing class ' + class_dict[str(key)])
@@ -617,8 +619,9 @@ def ov_test(model, criterion, postprocessors, dataset, data_loader, base_ds, dev
                             "bbox": b, 
                             "score": s,
                             }
+                    class_results.append(itemdict)
                     final_res.append(itemdict)
-                visual_result = True
+                visual_result = False
                 if visual_result:
                     image_path = '../dataset/COCO/val2017/' + str(image_id).rjust(12, '0') + '.jpg'
                     img = cv2.imread(image_path, 1)
@@ -638,6 +641,10 @@ def ov_test(model, criterion, postprocessors, dataset, data_loader, base_ds, dev
         if args.output_dir:
             import json
             with open(args.output_dir + f'/results_class{key}.json', 'w') as f:
-                json.dump(final_res, f, indent=2)
-        import pdb; pdb.set_trace()
+                json.dump(class_results, f, indent=2)
+        # import pdb; pdb.set_trace()
+    # if args.output_dir:
+    #     import json
+    #     with open(args.output_dir + f'/results_class_all.json', 'w') as f:
+    #         json.dump(final_res, f, indent=2)
     return final_res

@@ -465,16 +465,26 @@ class DINO(nn.Module):
             raise NotImplementedError
         split_hs = []
         for hs_item in hs:
+            hs_split = []
             split_num = hs_item.shape[1] // self.number_template
-            hs_item = torch.split(hs_item, split_num, dim = 1)
-            hs_item = torch.cat(hs_item, dim=0)
+            for i in range(len(hs_item)):
+                hs_temp = torch.split(hs_item[i], split_num, dim = 0)
+                hs_temp = torch.stack(hs_temp)
+                hs_split.append(hs_temp)
+            hs_item = torch.cat(hs_split, dim=0)
+            # import pdb; pdb.set_trace()
             split_hs.append(hs_item)
         hs = split_hs
         split_reference = []
         for reference_item in reference:
+            ref_split = []
             split_num = reference_item.shape[1] // self.number_template
-            reference_item = torch.split(reference_item, split_num, dim = 1)
-            reference_item = torch.cat(reference_item, dim=0)
+            for i in range(len(reference_item)):
+                ref_temp = torch.split(reference_item[i], split_num, dim = 0)
+                ref_temp = torch.stack(ref_temp)
+                ref_split.append(ref_temp)
+            reference_item = torch.cat(ref_split, dim=0)
+            # import pdb; pdb.set_trace()
             split_reference.append(reference_item)
         reference = split_reference
         # import pdb; pdb.set_trace()
@@ -589,6 +599,7 @@ class SetCriterion(nn.Module):
         target_classes_onehot.scatter_(2, target_classes.unsqueeze(-1), 1)
 
         target_classes_onehot = target_classes_onehot[:,:,:-1]
+        # import pdb; pdb.set_trace()
         loss_ce = sigmoid_focal_loss(src_logits, target_classes_onehot, num_boxes, alpha=self.focal_alpha, gamma=2) * src_logits.shape[1]
         losses = {'loss_ce': loss_ce}
 
@@ -622,6 +633,7 @@ class SetCriterion(nn.Module):
         idx = self._get_src_permutation_idx(indices)
         src_boxes = outputs['pred_boxes'][idx]
         target_boxes = torch.cat([t['boxes'][i] for t, (_, i) in zip(targets, indices)], dim=0)
+        # import pdb; pdb.set_trace()
 
         loss_bbox = F.l1_loss(src_boxes, target_boxes, reduction='none')
 
