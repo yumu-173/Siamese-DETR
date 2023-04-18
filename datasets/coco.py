@@ -368,6 +368,8 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         self.class_dict = {}
         if image_set in ['test', 'test_ov', 'train']:
             self.template_list = {}
+        if image_set == 'test_ov':
+            self.ids = sorted(self.ids)
         self.image_set = image_set
         self.number_template = number_template
 
@@ -442,7 +444,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
                         box[2] += box[0]
                         box[3] += box[1]
                         template = img.crop(box)
-                        template_path = 'ov_vis/template/template_' + str(key) + '.jpg'
+                        template_path = 'ov_vis/template/template_' + str(key) + '_' + str(image_id) +  '.jpg'
                         template.save(template_path)
                         # import pdb; pdb.set_trace()
                         template, _ = T.resize(template, target=None, size=400, max_size=400)
@@ -1085,7 +1087,7 @@ def build(image_set, args):
         pass
     elif image_set == 'train':
         dataset.get_class_id_to_img_id()
-        dataset.get_ov_template()
+        # dataset.get_ov_template()
         # import pdb; pdb.set_trace()
     else:
         dataset.get_class_id_to_img_id()
