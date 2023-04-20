@@ -43,13 +43,15 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     print_freq = 100
 
     _cnt = 0
-    for samples, targets, templates, temp_pos in metric_logger.log_every(data_loader, print_freq, header, logger=logger):
+    for samples, targets, templates, temp_pos, num_temp in metric_logger.log_every(data_loader, print_freq, header, logger=logger):
 
         samples = samples.to(device)
         merge_targets = []
+        num_temp = min(num_temp)
         for target_list in targets:
-            merge_targets.extend(target_list)
+            merge_targets.extend(target_list[:num_temp])
         targets = merge_targets 
+        # import pdb; pdb.set_trace()
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
         # import pdb; pdb.set_trace()
         # print('enter', targets[0]['boxes'].shape)
@@ -61,7 +63,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                 # import pdb; pdb.set_trace()
                 # print('poss:', temp_pos)
                 # ------------------------------------------------------------------------------------------------------
-                outputs, targets = model(samples, templates, targets)
+                outputs, targets = model(samples, templates, targets, num_temp=num_temp)
             else:
                 outputs, _ = model(samples)
             # import pdb; pdb.set_trace()
@@ -172,7 +174,7 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, out
 
     _cnt = 0
     output_state_dict = {} # for debug only
-    for samples, targets, templates, temp_pos in metric_logger.log_every(data_loader, 100, header, logger=logger):
+    for samples, targets, templates, temp_pos, num_temp in metric_logger.log_every(data_loader, 100, header, logger=logger):
         samples = samples.to(device)
         # import ipdb; ipdb.set_trace()
         merge_targets = []
@@ -180,13 +182,15 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, out
             merge_targets.extend(target_list)
         targets = merge_targets
         targets = [{k: to_device(v, device) for k, v in t.items()} for t in targets]
+        num_temp = min(num_temp)
         # import pdb; pdb.set_trace()
 
         with torch.cuda.amp.autocast(enabled=args.amp):
             if need_tgt_for_training:
-                outputs, targets = model(samples, templates, targets)
+                # import pdb; pdb.set_trace()
+                outputs, targets = model(samples, templates, targets, num_temp=num_temp)
             else:
-                outputs, _ = model(samples, templates)
+                outputs, _ = model(samples, templates, num_temp=num_temp)
             # outputs = model(samples)
 
             loss_dict, targets = criterion(outputs, targets)
@@ -392,7 +396,7 @@ def test(model, criterion, postprocessors, data_loader, base_ds, device, output_
             # print('after:', box[0])
             # print(_boxes)
             # print('boxes:', boxes)
-            keep = torchvision.ops.nms(box, _scores, 0.5)
+            keep = torchvision.ops.nms(box, _scores, 0.8)
             # print('keep:', _boxes)
             _boxes = _boxes[keep].tolist()
             # print(_boxes)
@@ -456,7 +460,7 @@ score_dict = {
     'ball-2': 0.25,
     'ball-1': 0.25,
     # 'ball-0': 0.009,
-    'else': 0.21
+    'else': 0.25
 }
 
 @torch.no_grad()
@@ -480,7 +484,8 @@ def track_test(model, criterion, postprocessors, dataset, base_ds, device, outpu
         tracker.reset()
         # import pdb;pdb.set_trace()
         if str(seq) in score_dict.keys():
-            tracker.detection_person_thresh = score_dict[str(seq)]
+            # tracker.detection_person_thresh = score_dict[str(seq)]
+            tracker.detection_person_thresh = 0.25
             # print(seq, tracker.detection_person_thresh)
         else:
             tracker.detection_person_thresh = score_dict['else']
@@ -573,8 +578,9 @@ def ov_test(model, criterion, postprocessors, dataset, data_loader, base_ds, dev
     final_res = []
     template_box = {}
     i = 1
+    # import pdb; pdb.set_trace()
     for key in dataset.template_list.keys():
-        # key = 1
+        key = 20
         class_results = []
         print('No.' + str(i), end=' ')
         i += 1
@@ -583,6 +589,17 @@ def ov_test(model, criterion, postprocessors, dataset, data_loader, base_ds, dev
             samples = samples.to(device)
             targets = [{k: to_device(v, device) for k, v in t.items()} for t in targets]
             templates = [dataset.template_list[key]]
+
+            # draw a template
+            # from torchvision import transforms
+            # unloader = transforms.ToPILImage()
+            # image = templates[0][0].cpu().clone()  # clone the tensor
+            # image = image.squeeze(0)  # remove the fake batch dimension
+            # image = unloader(image)
+            # name = 'ov_vis/test_' + str(key) + '.jpg'
+            # image.save(name)
+            # import pdb; pdb.set_trace()
+
             # import pdb; pdb.set_trace()
             outputs, _ = model(samples, templates)
 
@@ -602,6 +619,7 @@ def ov_test(model, criterion, postprocessors, dataset, data_loader, base_ds, dev
                 _scores = _scores[class_keep]
                 _labels = _labels[class_keep]
                 _boxes = _boxes[class_keep]
+                # import pdb; pdb.set_trace()
                 # ------------------ NMS -----------------------
                 box = torch.zeros_like(_boxes)
                 box[:, :2] = _boxes[:, :2] - (_boxes[:, 2:] / 2)
@@ -610,6 +628,16 @@ def ov_test(model, criterion, postprocessors, dataset, data_loader, base_ds, dev
                 _boxes = _boxes[keep].tolist()
                 _labels = _labels[keep].tolist()
                 _scores = _scores[keep].tolist()
+                # ----------------------------------------------
+                image_path = '../dataset/COCO/val2017/' + str(image_id).rjust(12, '0') + '.jpg'
+                img = cv2.imread(image_path, 1)
+                for i, box in enumerate(_boxes):
+                    if _scores[i] > 0.2 and _labels[i] == 1:
+                        cv2.putText(img, str(_labels[i])+':'+str(round(float(_scores[i]), 3)), (int(box[0]-box[2]/2), int(box[1]-box[3]/2)), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 255), 1)
+                        cv2.rectangle(img, (int(box[0]-box[2]/2), int(box[1]-box[3]/2)), (int(box[2]/2+box[0]), int(box[3]/2+box[1])), (0, 0, 255), 2)
+                save_path = 'ov_vis/' + str(image_id).rjust(12, '0') + '.jpg'
+                cv2.imwrite(save_path, img)
+                import pdb; pdb.set_trace()
                 # ----------------------------------------------
                 for s, l, b in zip(_scores, _labels, _boxes):
                     assert isinstance(l, int)
@@ -642,7 +670,6 @@ def ov_test(model, criterion, postprocessors, dataset, data_loader, base_ds, dev
             import json
             with open(args.output_dir + f'/results_class{key}.json', 'w') as f:
                 json.dump(class_results, f, indent=2)
-        # import pdb; pdb.set_trace()
     # if args.output_dir:
     #     import json
     #     with open(args.output_dir + f'/results_class_all.json', 'w') as f:

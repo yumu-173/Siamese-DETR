@@ -311,7 +311,7 @@ class DINO(nn.Module):
         else:
             raise NotImplementedError('Unknown fix_refpoints_hw {}'.format(self.fix_refpoints_hw))
 
-    def forward(self, samples: NestedTensor, templates: NestedTensor, targets:List=None, track_pos=None):
+    def forward(self, samples: NestedTensor, templates: NestedTensor, targets:List=None, track_pos=None, num_temp=1):
         """ The forward expects a NestedTensor, which consists of:
                - samples.tensor: batched images, of shape [batch_size x 3 x H x W]
                - samples.mask: a binary mask of shape [batch_size x H x W], containing 1 on padded pixels
@@ -332,7 +332,7 @@ class DINO(nn.Module):
         # templates = nested_tensor_from_tensor_list(templates).to('cuda')
         template = []
         for template_list in templates:
-            template.extend(template_list)
+            template.extend(template_list[:num_temp])
         # import pdb; pdb.set_trace()
         templates = nested_tensor_from_tensor_list(template).to('cuda')
 
@@ -458,11 +458,12 @@ class DINO(nn.Module):
         # print('srcs3:', srcs[3].shape)
         # --------------------------------------------------------------------------------------------------------------
         # hs, reference, hs_enc, ref_enc, init_box_proposal = self.transformer(srcs, masks, input_query_bbox, poss, input_query_label, temp_srcs, temp_masks, attn_mask)
-        hs, reference, hs_enc, ref_enc, init_box_proposal, dn_meta, template_feature = self.transformer(srcs, masks, poss, temp_srcs, temp_masks, targets, track_pos)
+        hs, reference, hs_enc, ref_enc, init_box_proposal, dn_meta, template_feature = self.transformer(srcs, masks, poss, temp_srcs, temp_masks, targets, track_pos, num_temp)
 
         # split output into batch
         if self.two_stage_type == 'standard':
             raise NotImplementedError
+        self.number_template = num_temp
         split_hs = []
         for hs_item in hs:
             hs_split = []

@@ -357,9 +357,18 @@ class DeformableTransformer(nn.Module):
                 feat_list.append(feat) 
             feat = torch.stack(feat_list, dim=0) # B x 1 x C
             if self.test_ov:
-                feat = torch.mean(feat, dim=0, keepdim=True)
                 # import pdb; pdb.set_trace()
+                feat = torch.mean(feat, dim=0, keepdim=True)
                 feat = feat.repeat(self.batch_size, 1, 1)
+
+                # use cluster
+                # from sklearn.cluster import KMeans
+                # X = feat.cpu().view(-1, 256)
+                # cluster = KMeans(n_clusters=1, random_state=0)
+                # cluster = cluster.fit(X)
+                # center = cluster.cluster_centers_[None, :, :]
+                # feat = torch.tensor(center).repeat(self.batch_size, 1, 1).to(torch.float32).cuda()
+                # import pdb; pdb.set_trace()
             if i == 0:
                 template_feature = feat
             else:
@@ -388,7 +397,7 @@ class DeformableTransformer(nn.Module):
     
 
     # def forward(self, srcs, masks, refpoint_embed, pos_embeds, tgt, template_features, temp_masks, attn_mask=None):
-    def forward(self, srcs, masks, pos_embeds, template_features, temp_masks, targets, track_pos=None):
+    def forward(self, srcs, masks, pos_embeds, template_features, temp_masks, targets, track_pos=None, num_temp=1):
 
         """
         Input:
@@ -401,7 +410,7 @@ class DeformableTransformer(nn.Module):
         """
         # if self.two_stage_type != 'no' and self.two_stage_add_query_num == 0:
         #     assert refpoint_embed is None
-        
+        self.number_template = num_temp
         # prepare input for encoder
         src_flatten = []
         mask_flatten = []
@@ -507,6 +516,7 @@ class DeformableTransformer(nn.Module):
                 template_feature = template_feature / self.template_lvl
             if self.dn_type == 'sample':
                 #prepare for dsn
+                # import pdb; pdb.set_trace()
                 tgt, refpoint_embed, attn_mask, dn_meta =\
                         prepare_for_sample_dn(dn_args=(targets, self.dn_number, self.dn_label_noise_ratio, self.dn_box_noise_scale),
                                                 training=self.training, num_queries=self.num_queries, hidden_dim=self.d_model, query_label=tgt_)
@@ -530,6 +540,7 @@ class DeformableTransformer(nn.Module):
             # import pdb; pdb.set_trace()
             if refpoint_embed is not None:
                 refpoint_embed = torch.cat([refpoint_embed, refpoint_embed_], dim=1)
+                # import pdb; pdb.set_trace()
                 tgt = torch.cat([tgt, tgt_], dim=1)
             else:
                 refpoint_embed, tgt = refpoint_embed_, tgt_
