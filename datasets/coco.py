@@ -1203,7 +1203,7 @@ def build(image_set, args):
     elif image_set == 'train':
         dataset.get_class_id_to_img_id()
         # dataset.get_class_weight()
-        dataset.get_ov_template()
+        # dataset.get_ov_template()
         # import pdb; pdb.set_trace()
     elif image_set == 'val':
         dataset.get_class_id_to_img_id()
