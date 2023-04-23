@@ -1,5 +1,5 @@
 GPUS=`nvidia-smi -L | wc -l`
-GPUS=1
+# GPUS=1
 
 [[ -z "$RANK" ]] && RANK=0
 [[ -z "$AZUREML_NODE_COUNT" ]] && NODE_COUNT=1 || NODE_COUNT=$AZUREML_NODE_COUNT
