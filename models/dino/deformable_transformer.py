@@ -597,7 +597,7 @@ class DeformableTransformer(nn.Module):
                 # import pdb; pdb.set_trace()
                 refpoint_embed_merge_list.append(merge)
             refpoint_embed = torch.cat(refpoint_embed_merge_list, dim=0)
-
+            # import pdb; pdb.set_trace()
             if self.num_patterns > 0:
                 tgt_embed = tgt.repeat(1, self.num_patterns, 1)
                 refpoint_embed = refpoint_embed.repeat(1, self.num_patterns, 1)

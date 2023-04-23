@@ -16,6 +16,8 @@ from torch.utils.data import DataLoader
 import time
 import tqdm
 import cv2
+from collections import Counter
+import matplotlib.pyplot as plt
 
 import util.misc as utils
 from datasets.coco_eval import CocoEvaluator
@@ -24,7 +26,8 @@ from datasets.panoptic_eval import PanopticEvaluator
 
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,
-                    device: torch.device, epoch: int, max_norm: float = 0, 
+                    device: torch.device, epoch: int, postprocessors,
+                    max_norm: float = 0, 
                     wo_class_error=False, lr_scheduler=None, args=None, logger=None, ema_m=None):
     scaler = torch.cuda.amp.GradScaler(enabled=args.amp)
 
@@ -43,8 +46,11 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     print_freq = 100
 
     _cnt = 0
-    for samples, targets, templates, temp_pos, num_temp in metric_logger.log_every(data_loader, print_freq, header, logger=logger):
-
+    template_class_list = []
+    for samples, targets, templates, num_temp, temp_cls in metric_logger.log_every(data_loader, print_freq, header, logger=logger):
+        # template_class_list.extend(temp_cls)
+        # # print(template_class_list)
+        # continue
         samples = samples.to(device)
         merge_targets = []
         num_temp = min(num_temp)
@@ -123,6 +129,14 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                 print("BREAK!"*5)
                 break
 
+    # counter = Counter(template_class_list)
+    # # draw class hist in coco
+    # x_value = [int(x) for x in counter.keys()]
+    # y_value = [counter[x]/len(template_class_list) for x in counter.keys()]
+    # plt.bar(x_value, y_value, width=0.8, bottom=None)
+    # plt.savefig('template/template_class_hist.png')
+    # exit(0)
+
     if getattr(criterion, 'loss_weight_decay', False):
         criterion.loss_weight_decay(epoch=epoch)
     if getattr(criterion, 'tuning_matching', False):
@@ -174,7 +188,7 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, out
 
     _cnt = 0
     output_state_dict = {} # for debug only
-    for samples, targets, templates, temp_pos, num_temp in metric_logger.log_every(data_loader, 100, header, logger=logger):
+    for samples, targets, templates, num_temp, temp_cls in metric_logger.log_every(data_loader, 100, header, logger=logger):
         samples = samples.to(device)
         # import ipdb; ipdb.set_trace()
         merge_targets = []
@@ -396,7 +410,7 @@ def test(model, criterion, postprocessors, data_loader, base_ds, device, output_
             # print('after:', box[0])
             # print(_boxes)
             # print('boxes:', boxes)
-            keep = torchvision.ops.nms(box, _scores, 0.8)
+            keep = torchvision.ops.nms(box, _scores, 0.9)
             # print('keep:', _boxes)
             _boxes = _boxes[keep].tolist()
             # print(_boxes)
@@ -580,7 +594,6 @@ def ov_test(model, criterion, postprocessors, dataset, data_loader, base_ds, dev
     i = 1
     # import pdb; pdb.set_trace()
     for key in dataset.template_list.keys():
-        key = 20
         class_results = []
         print('No.' + str(i), end=' ')
         i += 1
@@ -629,15 +642,15 @@ def ov_test(model, criterion, postprocessors, dataset, data_loader, base_ds, dev
                 _labels = _labels[keep].tolist()
                 _scores = _scores[keep].tolist()
                 # ----------------------------------------------
-                image_path = '../dataset/COCO/val2017/' + str(image_id).rjust(12, '0') + '.jpg'
-                img = cv2.imread(image_path, 1)
-                for i, box in enumerate(_boxes):
-                    if _scores[i] > 0.2 and _labels[i] == 1:
-                        cv2.putText(img, str(_labels[i])+':'+str(round(float(_scores[i]), 3)), (int(box[0]-box[2]/2), int(box[1]-box[3]/2)), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 255), 1)
-                        cv2.rectangle(img, (int(box[0]-box[2]/2), int(box[1]-box[3]/2)), (int(box[2]/2+box[0]), int(box[3]/2+box[1])), (0, 0, 255), 2)
-                save_path = 'ov_vis/' + str(image_id).rjust(12, '0') + '.jpg'
-                cv2.imwrite(save_path, img)
-                import pdb; pdb.set_trace()
+                # image_path = '../dataset/COCO/train2017/' + str(image_id).rjust(12, '0') + '.jpg'
+                # img = cv2.imread(image_path, 1)
+                # for i, box in enumerate(_boxes):
+                #     if _scores[i] > 0.2 and _labels[i] == 1:
+                #         cv2.putText(img, str(_labels[i])+':'+str(round(float(_scores[i]), 3)), (int(box[0]-box[2]/2), int(box[1]-box[3]/2)), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 255), 1)
+                #         cv2.rectangle(img, (int(box[0]-box[2]/2), int(box[1]-box[3]/2)), (int(box[2]/2+box[0]), int(box[3]/2+box[1])), (0, 0, 255), 2)
+                # save_path = 'ov_vis/vis/' + str(image_id).rjust(12, '0') + '.jpg'
+                # cv2.imwrite(save_path, img)
+                # import pdb; pdb.set_trace()
                 # ----------------------------------------------
                 for s, l, b in zip(_scores, _labels, _boxes):
                     assert isinstance(l, int)
@@ -654,7 +667,7 @@ def ov_test(model, criterion, postprocessors, dataset, data_loader, base_ds, dev
                     image_path = '../dataset/COCO/val2017/' + str(image_id).rjust(12, '0') + '.jpg'
                     img = cv2.imread(image_path, 1)
                     for i, box in enumerate(_boxes):
-                        if _scores[i] > 0.25:
+                        if _scores[i] > 0.2:
                             cv2.rectangle(img, (int(box[0]-box[2]/2), int(box[1]-box[3]/2)), (int(box[2]/2+box[0]), int(box[3]/2+box[1])), (0, 255, 0), 2)
                     save_path = 'ov_vis/vis/' + str(image_id).rjust(12, '0') + '.jpg'
                     cv2.imwrite(save_path, img)

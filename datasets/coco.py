@@ -26,6 +26,8 @@ import datasets.transforms as T
 from util.box_ops import box_cxcywh_to_xyxy, box_iou
 from copy import deepcopy
 from collections import Counter
+import torchvision.transforms as standard_transforms
+import matplotlib.pyplot as plt
 
 from .gmot_wrapper import GMOT40Wrapper
 
@@ -431,13 +433,9 @@ class CocoDetection(torchvision.datasets.CocoDetection):
             # exit(0)
         
     def get_ov_template(self):
-        template_number = 100
+        template_number = 10
         # import pdb; pdb.set_trace()
         for key in self.class_dict.keys():
-            if key == 20:
-                print(key)
-            else:
-                continue
             templates = []
             # image_id = self.class_dict[key][0]
             for image_id in self.class_dict[key]:
@@ -464,7 +462,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
                         image = template.cpu().clone()  # clone the tensor
                         image = image.squeeze(0)  # remove the fake batch dimension
                         image = unloader(image)
-                        name = 'ov_vis/1template/example_' + str(key) + '_' + str(image_id) + '.jpg'
+                        name = 'ov_vis/template/example_' + str(key) + '_' + str(image_id) + '.jpg'
                         # image.save(name)
                         templates.append(template)
                         # self.template_list[key] = [template]
@@ -482,6 +480,14 @@ class CocoDetection(torchvision.datasets.CocoDetection):
             target = self._load_target(i)
             category_list.extend([x['category_id'] for x in target])
         counter = Counter(category_list)
+
+        # draw class hist in coco
+        # x_value = [int(x) for x in counter.keys()]
+        # y_value = [counter[x]/len(category_list) for x in counter.keys()]
+        # plt.bar(x_value, y_value, width=0.8, bottom=None)
+        # plt.savefig('template/coco_class_hist.png')
+        # exit(0)
+
         for i in counter:
             self.class_weight[i] = 1/(counter[i]/len(category_list))
 
@@ -532,7 +538,25 @@ class CocoDetection(torchvision.datasets.CocoDetection):
             if self.class_dict[key]['image'].count(image_id):
                 # print('sequence:', key)
                 if key not in self.template_list.keys():
-                    template_idx = random.randint(0, len(self.class_dict[key]['template'])-1)
+                    # random.seed(3)
+                    # template_idx = random.randint(0, len(self.class_dict[key]['template'])-1)
+                    # template group 1
+                    # template_idx = int(len(self.class_dict[key]['template'])/2)
+
+                    # template group 2
+                    with open('template/group2.json') as f:
+                        temp = json.load(f)
+                    template_idx = temp[key]
+                    
+                    # template group 3
+                    # with open('template/group3.json') as f:
+                    #     temp = json.load(f)
+                    # template_idx = temp[key]
+
+                    # save template id
+                    # with open('template/group3.txt', 'a') as f:
+                    #     f.write(key + ':' + str(template_idx) + '\n')
+
                     box = self.class_dict[key]['template'][template_idx]['bbox']
                     box[2] = box[0] + max(1, box[2])
                     box[3] = box[1] + max(box[3], 1)
@@ -540,10 +564,11 @@ class CocoDetection(torchvision.datasets.CocoDetection):
                     temp_image_id = self.class_dict[key]['template_img']
                     template_img = self._load_image(temp_image_id)
                     template = template_img.crop(box)
-                    # cv2.imwrite('template/gmot/'+key+'.jpg', template)
+                    template.save('template/gmot3/'+key+'.jpg')
                     self.template_list[key] = template
                 else:
                     template = self.template_list[key]
+
 
         img, target = self.prepare(img, target)
         if self._transforms is not None:
@@ -595,25 +620,27 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         # print('*****num:{}*****'.format(num))
         template_list = []
         targets_list = []
+        temp_cls_list = []
         # print(num)
         if self.number_template == 1:
             num_template = 1
             if num == 1:
                 temp_idx = 0
             else:
-                category_list = [x['category_id'] for x in target['annotations']]
-                choise_list = torch.tensor(list(set(category_list)))
-                category_list = torch.tensor(category_list)
-                weights = torch.tensor([self.class_weight[x] for x in choise_list.tolist()])
-                template_class = choise_list[torch.multinomial(weights, self.number_template, replacement=False)].item()
+                # category_list = [x['category_id'] for x in target['annotations']]
+                # choise_list = torch.tensor(list(set(category_list)))
+                # category_list = torch.tensor(category_list)
+                # weights = torch.tensor([self.class_weight[x] for x in choise_list.tolist()])
+                # template_class = choise_list[torch.multinomial(weights, self.number_template, replacement=False)].item()
                 # if template_class == 1:
                 #     self.count1 += 1
                 #     print(self.count1)
-                category_mask = (category_list == template_class).int()
-                same_category_template_num = sum(category_mask)
-                nth, index_list = torch.topk(category_mask, same_category_template_num)
-                temp_idx = random.choice(index_list.tolist())
+                # category_mask = (category_list == template_class).int()
+                # same_category_template_num = sum(category_mask)
+                # nth, index_list = torch.topk(category_mask, same_category_template_num)
+                # temp_idx = random.choice(index_list.tolist())
 
+                temp_idx = np.random.randint(0, num - 1)
                 choise_num = 0
                 while min(target['annotations'][temp_idx]['bbox'][2], target['annotations'][temp_idx]['bbox'][3]) <= 1 and choise_num < 5:
                     temp_idx = np.random.randint(0, num - 1)
@@ -654,38 +681,37 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         
         # use more than 1 template
         if self.number_template > 1:
-            # temp_ann = []
-            # while len(temp_ann) < self.number_template:
-            #     temp_ann += deepcopy(target['annotations'])
-            temp_ann = target['annotations']
+            temp_ann = []
+            while len(temp_ann) < self.number_template:
+                temp_ann += deepcopy(target['annotations'])
+            # temp_ann = target['annotations']
             num_template = min(self.number_template, len(temp_ann))
-            category_list = [x['category_id'] for x in temp_ann]
-            choise_list = torch.tensor(list(set(category_list)))
-            category_list = torch.tensor(category_list)
-            weights = torch.tensor([self.class_weight[x] for x in choise_list.tolist()])
-            if len(choise_list) > 1:
-                template_class_list = torch.multinomial(weights, num_template, replacement=False).tolist()
-            else:
-                template_class_list = torch.multinomial(weights, num_template, replacement=True).tolist()
+            # category_list = [x['category_id'] for x in temp_ann]
+            # choise_list = torch.tensor(list(set(category_list)))
+            # category_list = torch.tensor(category_list)
+            # weights = torch.tensor([self.class_weight[x] for x in choise_list.tolist()])
+            # if len(choise_list) > 1:
+            #     template_class_list = torch.multinomial(weights, num_template, replacement=False).tolist()
+            # else:
+            #     template_class_list = torch.multinomial(weights, num_template, replacement=True).tolist()
             
             # load another template
             for _ in range(num_template):
 
                 # choose other template category with higher chance
-                template_class = choise_list[template_class_list[_]].item()
-                # import pdb; pdb.set_trace()
-                # if template_class == 1:
-                #     self.count1 += 1
-                #     print(self.count1)
-                category_mask = (category_list == template_class).int()
-                same_category_template_num = sum(category_mask)
-                nth, index_list = torch.topk(category_mask, same_category_template_num)
-                temp_idx = random.choice(index_list.tolist())
+                # template_class = choise_list[template_class_list[_]].item()
+                # category_mask = (category_list == template_class).int()
+                # same_category_template_num = sum(category_mask)
+                # nth, index_list = torch.topk(category_mask, same_category_template_num)
+                # temp_idx = random.choice(index_list.tolist())
+                temp_idx = random.randint(0, len(temp_ann)-1)
                 choise_num = 0
-                while min(target['annotations'][temp_idx]['bbox'][2], target['annotations'][temp_idx]['bbox'][3]) <= 1 and choise_num < 5:
-                    temp_idx = random.choice(index_list.tolist())
+                while min(temp_ann[temp_idx]['bbox'][2], temp_ann[temp_idx]['bbox'][3]) <= 1 and choise_num < 5:
+                    # temp_idx = random.choice(index_list.tolist())
+                    temp_idx = random.randint(0, len(temp_ann)-1)
                     choise_num += 1
-
+                template_class = temp_ann[temp_idx]['category_id']
+                temp_cls_list.append(template_class)
                 # print('temp_idx:{},template_class:{}'.format(temp_idx, template_class))
                 new_img_id = random.choice(self.class_dict[template_class])
                 new_idx = self.ids.index(new_img_id)
@@ -766,9 +792,37 @@ class CocoDetection(torchvision.datasets.CocoDetection):
             new_targets.append(new_t)
         target = new_targets
         # # 如果只有一个gt,看看这里的target长度是不是1
-        # import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()        from PIL import ImageDraw
+        # def tensor_to_img(x):
+        #     mean = torch.tensor([0.485, 0.456, 0.406]).view(1,1,3)
+        #     std = torch.tensor([0.229, 0.224, 0.225]).view(1,1,3)
+        #     x = ((x.permute(1,2,0) * std) + mean) * 255
+        #     x = np.array(x.clamp(0, 255), np.uint8)
+        #     x = cv2.cvtColor(x,cv2.COLOR_RGB2BGR)
+        #     return x
+        
+        # for _ in range(num_template):
+        #     image = tensor_to_img(img)
+        #     image_path = 'ov_vis/train_vis/' + '_' + str(image_id) +  '.jpg'
+        #     boxes = target[_]['boxes']
+        #     boxes[:, 0] *= target[_]['size'][1]
+        #     boxes[:, 1] *= target[_]['size'][0]
+        #     boxes[:, 2] *= target[_]['size'][1]
+        #     boxes[:, 3] *= target[_]['size'][0]
 
-        return img, target, return_template_list, box, num_template
+        #     for i, box in enumerate(boxes):
+        #         if target[_]['labels'][i] == 1:
+        #             cv2.rectangle(image, (int(box[0]-box[2]/2), int(box[1]-box[3]/2)), (int(box[2]/2+box[0]), int(box[3]/2+box[1])), (0,255,0), 2)
+        #         # cv2.putText(image, str(int(target[_]['labels'][i])), (int(box[0]-box[2]/2), int(box[1]-box[3]/2)), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 255, 0), 2)
+        #         else:
+        #             cv2.rectangle(image, (int(box[0]-box[2]/2), int(box[1]-box[3]/2)), (int(box[2]/2+box[0]), int(box[3]/2+box[1])), (0,0,255), 2)
+        #     cv2.imwrite(image_path, image)
+        #     # import pdb; pdb.set_trace()
+        #     temp_image = tensor_to_img(return_template_list[_])
+        #     name = 'ov_vis/train_template/example_' + '_' + str(image_id) + '.jpg'
+        #     cv2.imwrite(name, temp_image)
+        # import pdb; pdb.set_trace()
+        return img, target, return_template_list, num_template, temp_cls_list
 
 
 def convert_coco_poly_to_mask(segmentations, height, width):
@@ -1097,7 +1151,8 @@ def build(image_set, args):
         "train_adj": (root, root / "annotations" / f'fsc_adj.json'),
         "test":(gmot_root, gmot_root / 'annotations' / 'gmot_test.json'),
         "test_track":(gmot_root, gmot_root / 'annotations' / 'gmot_test.json'),
-        "test_ov": (root / 'val2017', root / "annotations" / f'{mode}_val2017.json'),
+        "test_ov":(root / 'train2017', root / "annotations" / f'{mode}_train2017.json'),
+        # "test_ov": (root / 'val2017', root / "annotations" / f'{mode}_val2017.json'),
         "train_reg": (root / "train2017", root / "annotations" / f'{mode}_train2017.json'),
         "val": (root / 'val2017', root / "annotations" / f'{mode}_val2017.json'),
         "val_ov": (root / 'val2017', ov_root / "annotations" / f'{mode}_ov_val2017.json'),
@@ -1122,6 +1177,15 @@ def build(image_set, args):
     if image_set == 'test_track':
         dataset = GMOT40Wrapper()
         # import pdb; pdb.set_trace()
+    elif image_set == 'test_ov':
+        dataset = CocoDetection(img_folder, ann_file,
+                transforms=make_coco_transforms(image_set, fix_size=args.fix_size, strong_aug=strong_aug, args=args), 
+                return_masks=args.masks,
+                image_set=image_set,
+                aux_target_hacks=aux_target_hacks_list,
+                number_template=args.number_template,
+                # num_imgs=100,
+            )
     else:
         dataset = CocoDetection(img_folder, ann_file,
                 transforms=make_coco_transforms(image_set, fix_size=args.fix_size, strong_aug=strong_aug, args=args), 
@@ -1138,12 +1202,14 @@ def build(image_set, args):
         pass
     elif image_set == 'train':
         dataset.get_class_id_to_img_id()
-        dataset.get_class_weight()
-        # dataset.get_ov_template()
+        # dataset.get_class_weight()
+        dataset.get_ov_template()
         # import pdb; pdb.set_trace()
+    elif image_set == 'val':
+        dataset.get_class_id_to_img_id()
+        # dataset.get_class_weight()
     else:
         dataset.get_class_id_to_img_id()
-        dataset.get_class_weight()
         print(dataset.class_dict.keys())
     return dataset
 

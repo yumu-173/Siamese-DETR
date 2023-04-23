@@ -84,6 +84,7 @@ def get_args_parser():
     parser.add_argument('--test_track', default=False, action='store_true', help='test gmot with tracktor')
     parser.add_argument('--test_ov', default=False, action='store_true', help='test ov coco')
     parser.add_argument('--dn_type', default='sample', help='you can chose dsn, dn and no dn')
+    parser.add_argument('--number_template', default=2, type=int, help='number of template use in one image')
 
     # distributed training parameters
     parser.add_argument('--world_size', default=1, type=int,
@@ -363,7 +364,7 @@ def main(args):
         if args.distributed:
             sampler_train.set_epoch(epoch)
         train_stats = train_one_epoch(
-            model, criterion, data_loader_train, optimizer, device, epoch,
+            model, criterion, data_loader_train, optimizer, device, epoch, postprocessors,
             args.clip_max_norm, wo_class_error=wo_class_error, lr_scheduler=lr_scheduler, args=args, logger=(logger if args.save_log else None), ema_m=ema_m)
         
         print('train')
