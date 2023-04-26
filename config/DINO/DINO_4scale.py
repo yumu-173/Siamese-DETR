@@ -13,12 +13,12 @@ lr_linear_proj_mult = 0.1
 ddetr_lr_param = False
 # batch_size = 8
 weight_decay = 0.0001
-epochs = 12
+epochs = 36
 lr_drop = 11
 save_checkpoint_interval = 1
 clip_max_norm = 0.1
 onecyclelr = False
-multi_step_lr = False
+multi_step_lr = True
 lr_drop_list = [11, 20, 30]
 
 
@@ -102,7 +102,7 @@ dn_number = 100
 dn_box_noise_scale = 0.4
 dn_label_noise_ratio = 0.5
 embed_init_tgt = True
-dn_labelbook_size = 2
+dn_labelbook_size = 1
 
 match_unstable_error = True
 
@@ -128,13 +128,13 @@ frame_range = {
   'end': 1.0
 }
 # FRCNN score threshold for detections
-detection_person_thresh = 0.21
+detection_person_thresh = 0.25
 # FRCNN score threshold for keeping the track alive
-regression_person_thresh = 0.1
+regression_person_thresh = 0.05
 # NMS threshold for detection
-detection_nms_thresh = 0.8
+detection_nms_thresh = 0.5
 # NMS theshold while tracking
-regression_nms_thresh = 0.8
+regression_nms_thresh = 0.5
 # motion model settings
 motion_model = {
     'enabled': False, 
