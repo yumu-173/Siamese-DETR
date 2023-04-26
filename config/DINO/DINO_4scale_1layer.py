@@ -2,7 +2,7 @@ _base_ = ['coco_transformer.py']
 
 num_classes = 2
 template_lvl = 1
-number_template = 1
+# number_template = 1
 
 lr = 0.0001
 param_dict_type = 'default'

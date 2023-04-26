@@ -28,6 +28,7 @@ from copy import deepcopy
 from collections import Counter
 import torchvision.transforms as standard_transforms
 import matplotlib.pyplot as plt
+from PIL import Image
 
 from .gmot_wrapper import GMOT40Wrapper
 
@@ -500,8 +501,89 @@ class CocoDetection(torchvision.datasets.CocoDetection):
             return self.getitem_test(idx)
         elif self.image_set == 'test_ov':
             return self.getitem_test_ov(idx)
+        elif self.number_template == 1:
+            return self.get_item_ablation(idx)
         else:
             return self.getitem_train(idx)
+    
+    def get_item_ablation(self, idx):
+        try:
+            img, target = super(CocoDetection, self).__getitem__(idx)
+            while len(target) <= 0:
+                idx += 1
+                img, target = super(CocoDetection, self).__getitem__(idx)
+        except:
+            print("Error idx: {}".format(idx))
+            idx += 1
+            img, target = super(CocoDetection, self).__getitem__(idx)
+        image_id = self.ids[idx]
+        # print('template image id:', image_id)
+        for item in target:
+            item['template_id'] = 0
+        target = {'image_id': image_id, 'annotations': target}
+        # --------------------------------------------------------------------------------------------------------------
+        img, target = self.prepare(img, target)
+        if self._transforms is not None:
+            img, target = self._transforms(img, target)
+        # --------------------------------------------------------------------------------------------------------------
+        # import pdb; pdb.set_trace()
+        num = len(target['labels'])
+        template_list = []
+        temp_cls_list = []
+        if num == 1:
+            temp_idx = 0
+        else:
+            temp_idx = np.random.randint(0, num - 1)
+        template_class = target['labels'][temp_idx].item()
+        temp_cls_list.append(template_class)
+        new_img_id = random.choice(self.class_dict[template_class])
+        new_idx = self.ids.index(new_img_id)
+        new_idx = self.ids.index(new_img_id)
+        new_img, new_img_target = super(CocoDetection, self).__getitem__(new_idx)
+        template_anno = list(filter(lambda item: item['category_id'] == template_class, new_img_target))
+        
+        if len(template_anno) > 1:
+            box = deepcopy(template_anno[np.random.randint(0, max(len(template_anno) - 1, 0))]['bbox'])
+        else:
+            box = deepcopy(template_anno[0]['bbox'])
+        box[2] = box[0] + max(1, box[2])
+        box[3] = box[1] + max(box[3], 1)
+        template = new_img.crop(box)
+        template_list.append(template)
+        
+        return_template_list = []
+        tran_template = T.Compose([ 
+            T.ToTensor(),
+            T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+        ])
+        for template in template_list:    
+            template, _ = T.resize(template, target=None, size=400, max_size=400)
+            template, _ = tran_template(template, target)
+            return_template_list.append(template)
+        if self.aux_target_hacks is not None:
+            for hack_runner in self.aux_target_hacks:
+                target, img = hack_runner(target, img=img)
+
+        # split target into bs*template_num
+        new_targets = []
+        for num in range(self.number_template):
+            new_t = {}
+            # import pdb; pdb.set_trace()
+            keep = target['labels']==template_class
+            # import pdb; pdb.set_trace()
+            for key in target.keys():
+                if key in ['boxes', 'labels', 'iscrowd', 'area', 'template_id']:
+                    new_t[key] = target[key][keep]
+                    # targets[key] = targets[key][keep]
+                else:
+                    new_t[key] = target[key]
+            new_targets.append(new_t)
+        for tgt in new_targets:
+            tgt['labels'] = torch.ones_like(tgt['labels'])
+        target = new_targets
+        # import pdb; pdb.set_trace()
+
+        return img, target, return_template_list, self.number_template, temp_cls_list
     
     def getitem_test_ov(self, idx):
         try:
@@ -538,33 +620,30 @@ class CocoDetection(torchvision.datasets.CocoDetection):
             if self.class_dict[key]['image'].count(image_id):
                 # print('sequence:', key)
                 if key not in self.template_list.keys():
-                    # random.seed(3)
+                    # random.seed(2)
                     # template_idx = random.randint(0, len(self.class_dict[key]['template'])-1)
                     # template group 1
-                    # template_idx = int(len(self.class_dict[key]['template'])/2)
+                    # template = Image.open('template/gmot1/' + key +'.jpg')
 
                     # template group 2
-                    with open('template/group2.json') as f:
-                        temp = json.load(f)
-                    template_idx = temp[key]
+                    # template = Image.open('template/gmot2/' + key +'.jpg')
                     
                     # template group 3
-                    # with open('template/group3.json') as f:
-                    #     temp = json.load(f)
-                    # template_idx = temp[key]
+                    template = Image.open('template/gmot3/' + key +'.jpg')
 
                     # save template id
                     # with open('template/group3.txt', 'a') as f:
                     #     f.write(key + ':' + str(template_idx) + '\n')
 
-                    box = self.class_dict[key]['template'][template_idx]['bbox']
-                    box[2] = box[0] + max(1, box[2])
-                    box[3] = box[1] + max(box[3], 1)
-                    # print(box)
-                    temp_image_id = self.class_dict[key]['template_img']
-                    template_img = self._load_image(temp_image_id)
-                    template = template_img.crop(box)
-                    template.save('template/gmot3/'+key+'.jpg')
+                    # box = self.class_dict[key]['template'][template_idx]['bbox']
+                    # box[2] = box[0] + max(1, box[2])
+                    # box[3] = box[1] + max(box[3], 1)
+                    # # print(box)
+                    # temp_image_id = self.class_dict[key]['template_img']
+                    # template_img = self._load_image(temp_image_id)
+                    # template = template_img.crop(box)
+                    # template.save('template/gmot3/'+key+'.jpg')
+
                     self.template_list[key] = template
                 else:
                     template = self.template_list[key]
@@ -622,6 +701,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         targets_list = []
         temp_cls_list = []
         # print(num)
+
         if self.number_template == 1:
             num_template = 1
             if num == 1:
@@ -678,7 +758,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
                     item['template_id'] = 0
                 targets_list.append(item)
             # target = {'image_id': image_id, 'annotations': target_2class} 
-        
+
         # use more than 1 template
         if self.number_template > 1:
             temp_ann = []

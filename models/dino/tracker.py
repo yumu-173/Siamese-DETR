@@ -6,6 +6,7 @@ import torch
 from scipy.optimize import linear_sum_assignment
 from torchreid import metrics
 from torchvision.ops.boxes import clip_boxes_to_image, nms
+from copy import deepcopy
 
 from .utils_track import (bbox_overlaps, get_center, get_height, get_width, make_pos,
                     warp_pos)
@@ -83,7 +84,8 @@ class Tracker:
         # import pdb; pdb.set_trace()
         # boxes, scores = self.obj_detect.predict_boxes(pos)
         pos = clip_boxes_to_image(boxes, blob['img'].shape[-2:])
-        keep = nms(pos, scores, 0.85)
+        # import pdb; pdb.set_trace()
+        keep = nms(pos, scores, 0.8)
         pos = pos[keep]
         scores = scores[keep]
         boxes_index = box_index[keep]
@@ -323,7 +325,8 @@ class Tracker:
             raise RuntimeError('The following code has some errors need to be fixed!')
         else:
             if len(self.tracks):
-                pos = self.get_pos()
+                poses = self.get_pos()
+                pos = deepcopy(poses)
                 pos[:, 0] /= w
                 pos[:, 1] /= h
                 pos[:, 2] /= w
@@ -396,7 +399,8 @@ class Tracker:
             if len(self.tracks):
                 # create nms input
                 # nms here if tracks overlap
-                pos = self.get_pos()
+                poses = self.get_pos()
+                pos = deepcopy(poses)
                 pos[:, 0] = pos[:, 0] - pos[:, 2]/2
                 pos[:, 1] = pos[:, 1] - pos[:, 3]/2
                 pos[:, 2] = pos[:, 2] + pos[:, 0]
@@ -419,7 +423,12 @@ class Tracker:
         # !!! In the paper this is done by calculating the overlap with existing tracks, but the
         # !!! result stays the same.
         if det_pos.nelement() > 0:
-            keep = nms(det_pos, det_scores, self.detection_nms_thresh)
+            det_poses = deepcopy(det_pos)
+            det_poses[:, 0] = det_pos[:, 0] - det_pos[:, 2]/2
+            det_poses[:, 1] = det_pos[:, 1] - det_pos[:, 3]/2
+            det_poses[:, 2] = det_pos[:, 0] + det_pos[:, 2]/2
+            det_poses[:, 3] = det_pos[:, 1] + det_pos[:, 3]/2
+            keep = nms(det_poses, det_scores, self.detection_nms_thresh)
             det_pos = det_pos[keep]
             det_scores = det_scores[keep]
 
@@ -427,15 +436,15 @@ class Tracker:
             
             for t in self.tracks:
                 
-                nms_track_pos = torch.cat([t.pos, det_pos])
+                nms_track_poses = torch.cat([t.pos, det_pos])
                 nms_track_scores = torch.cat([torch.tensor([1.0]).to(det_scores.device), det_scores])
                 # nms_track_scores = torch.cat([torch.tensor([t.score]).to(det_scores.device), det_scores])
+                nms_track_pos = deepcopy(nms_track_poses)
                 nms_track_pos[:, 0] = nms_track_pos[:, 0] - nms_track_pos[:, 2]/2
                 nms_track_pos[:, 1] = nms_track_pos[:, 1] - nms_track_pos[:, 3]/2
                 nms_track_pos[:, 2] = nms_track_pos[:, 2] + nms_track_pos[:, 0]
                 nms_track_pos[:, 3] = nms_track_pos[:, 3] + nms_track_pos[:, 1]
                 keep = nms(nms_track_pos, nms_track_scores, self.detection_nms_thresh)
-                # import pdb; pdb.set_trace()
                 keep = keep[torch.ge(keep, 1)] - 1
 
                 det_pos = det_pos[keep]
