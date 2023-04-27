@@ -528,6 +528,27 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         # --------------------------------------------------------------------------------------------------------------
         # import pdb; pdb.set_trace()
         num = len(target['labels'])
+        while num == 0:
+            try:
+                img, target = super(CocoDetection, self).__getitem__(idx)
+                while len(target) <= 0:
+                    idx += 1
+                    img, target = super(CocoDetection, self).__getitem__(idx)
+            except:
+                print("Error idx: {}".format(idx))
+                idx += 1
+                img, target = super(CocoDetection, self).__getitem__(idx)
+            image_id = self.ids[idx]
+            # print('template image id:', image_id)
+            for item in target:
+                item['template_id'] = 0
+            target = {'image_id': image_id, 'annotations': target}
+            # --------------------------------------------------------------------------------------------------------------
+            img, target = self.prepare(img, target)
+            if self._transforms is not None:
+                img, target = self._transforms(img, target)
+            # --------------------------------------------------------------------------------------------------------------
+            num = len(target['labels'])
         template_list = []
         temp_cls_list = []
         if num == 1:
