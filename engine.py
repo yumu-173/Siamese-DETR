@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt
 import util.misc as utils
 from datasets.coco_eval import CocoEvaluator
 from datasets.panoptic_eval import PanopticEvaluator
-
+from pathlib import Path
 
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,
@@ -51,6 +51,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         # template_class_list.extend(temp_cls)
         # # print(template_class_list)
         # continue
+
         samples = samples.to(device)
         merge_targets = []
         num_temp = min(num_temp)
@@ -436,47 +437,228 @@ def test(model, criterion, postprocessors, data_loader, base_ds, device, output_
 
 score_dict = {
     'airplane-3': 0.3,
-    'airplane-0': 0.25,
-    'airplane-1': 0.25,
-    'airplane-2': 0.3,
+    'airplane-0': 0.23, # 23
+    'airplane-1': 0.35, # 35
+    'airplane-2': 0.28,
     'bird-1': 0.25,
-    'bird-0': 0.2,
-    'bird-2': 0.25,
-    'bird-3': 0.3,
-    'person-3': 0.25,
+    # 'bird-0': 0.2,
+    'bird-2': 0.3,
+    # 'bird-3': 0.3,
+    'person-3': 0.3,
     'person-1': 0.3, # 25
-    'person-2': 0.3,
-    'stock-3': 0.3,
-    'stock-2': 0.25,
+    'person-2': 0.4,
+    'person-0': 0.23,
+    'stock-3': 0.35,
+    # 'stock-2': 0.23,
     'stock-1': 0.3,
-    'car-0': 0.25,
-    'car-1': 0.25, # 23
-    'car-2': 0.2, # 18
-    'car-3': 0.25,
-    'insect-3': 0.25,
-    'insect-2': 0.25,
-    'insect-1': 0.25,
+    'stock-0': 0.22,
+    # 'car-0': 0.15,
+    'car-1': 0.43, # 23
+    'car-2': 0.3, # 18
+    # 'car-3': 0.25,
+    'insect-3': 0.3,
+    'insect-2': 0.3,
+    # 'insect-1': 0.25,
     # 'insect-0': 0.2,
-    'balloon-3': 0.25, # 15
-    # 'balloon-2': 0.2,
-    'balloon-1': 0.25, # 17
+    'balloon-3': 0.13, # 15
+    'balloon-2': 0.2,
+    'balloon-1': 0.15, # 2
     # 'balloon-0': 0.25,
-    'fish-3': 0.25,
-    'fish-2': 0.25,
-    'fish-1': 0.25,
-    'fish-0': 0.25,
-    # 'boat-3': 0.03,
+    'fish-3': 0.23,
+    'fish-2': 0.23,
+    # 'fish-1': 0.23,
+    # 'fish-0': 0.23,
+    'boat-3': 0.27,
     # 'boat-2': 0.006,
-    # 'boat-1': 0.025,
-    # 'boat-0': 0.03,
-    'ball-3': 0.18,
-    'ball-0': 0.25,
-    'ball-2': 0.25,
-    'ball-1': 0.25,
+    'boat-1': 0.33,
+    'boat-0': 0.2, # 2
+    # 'ball-3': 0.18,
+    # 'ball-0': 0.25,
+    # 'ball-2': 0.15,
+    # 'ball-1': 0.25,
     # 'ball-0': 0.009,
     'else': 0.25
 }
 
+score_dict_no = {
+    'airplane-3': 0.28,
+    'airplane-0': 0.18, # 23
+    'airplane-1': 0.25, # 35
+    'airplane-2': 0.25,
+    'bird-1': 0.25,
+    # 'bird-0': 0.2,
+    'bird-2': 0.17,
+    'bird-3': 0.2,
+    'person-3': 0.25,
+    'person-1': 0.3, # 25
+    'person-2': 0.35,
+    'person-0': 0.2,
+    'stock-3': 0.25,
+    # 'stock-2': 0.23,
+    'stock-1': 0.25,
+    'stock-0': 0.22,
+    # 'car-0': 0.15,
+    'car-1': 0.3, # 23
+    'car-2': 0.2, # 18
+    # 'car-3': 0.25,
+    'insect-3': 0.3,
+    'insect-2': 0.3,
+    # 'insect-1': 0.25,
+    # 'insect-0': 0.2,
+    'balloon-3': 0.13, # 15
+    'balloon-2': 0.2,
+    'balloon-1': 0.12, # 2
+    # 'balloon-0': 0.25,
+    'fish-3': 0.21,
+    'fish-2': 0.2,
+    # 'fish-1': 0.23,
+    'fish-0': 0.18,
+    'boat-3': 0.25,
+    'boat-2': 0.22,
+    'boat-1': 0.22,
+    'boat-0': 0.17, # 2
+    'ball-3': 0.2,
+    # 'ball-0': 0.25,
+    # 'ball-2': 0.15,
+    # 'ball-1': 0.25,
+    'ball-0': 0.23,
+    'else': 0.25
+}
+
+score_dict_4t = {
+    'airplane-3': 0.35,
+    'airplane-0': 0.25, # 23
+    'airplane-1': 0.35, # 35
+    'airplane-2': 0.28,
+    'bird-1': 0.25,
+    'bird-0': 0.2,
+    'bird-2': 0.3,
+    # 'bird-3': 0.3,
+    'person-3': 0.3,
+    'person-1': 0.3, # 25
+    'person-2': 0.42,
+    'person-0': 0.23,
+    'stock-3': 0.35,
+    # 'stock-2': 0.23,
+    # 'stock-1': 0.33,
+    'stock-0': 0.22,
+    # 'car-0': 0.15,
+    'car-1': 0.35, # 23
+    'car-2': 0.3, # 18
+    # 'car-3': 0.25,
+    'insect-3': 0.3,
+    'insect-2': 0.3,
+    'insect-1': 0.4,
+    # 'insect-0': 0.2,
+    'balloon-3': 0.1, # 15
+    'balloon-2': 0.2,
+    'balloon-1': 0.15, # 2
+    # 'balloon-0': 0.25,
+    'fish-3': 0.2,
+    'fish-2': 0.25,
+    'fish-1': 0.27,
+    # 'fish-0': 0.23,
+    'boat-3': 0.3,
+    'boat-2': 0.27,
+    'boat-1': 0.33,
+    'boat-0': 0.25, # 2
+    # 'ball-3': 0.18,
+    'ball-0': 0.23,
+    # 'ball-2': 0.15,
+    # 'ball-1': 0.25,
+    # 'ball-0': 0.009,
+    'else': 0.25
+}
+
+score_dict_ori = {
+    'airplane-3': 0.28,
+    'airplane-0': 0.2, # 23
+    'airplane-1': 0.25, # 35
+    'airplane-2': 0.25,
+    'bird-1': 0.25,
+    # 'bird-0': 0.2,
+    'bird-2': 0.22,
+    'bird-3': 0.2,
+    'person-3': 0.28,
+    'person-1': 0.3, # 25
+    'person-2': 0.35,
+    'person-0': 0.23,
+    'stock-3': 0.28,
+    # 'stock-2': 0.23,
+    'stock-1': 0.28,
+    'stock-0': 0.22,
+    # 'car-0': 0.15,
+    'car-1': 0.3, # 23
+    'car-2': 0.2, # 18
+    # 'car-3': 0.25,
+    'insect-3': 0.3,
+    'insect-2': 0.3,
+    # 'insect-1': 0.25,
+    # 'insect-0': 0.2,
+    'balloon-3': 0.15, # 15
+    'balloon-2': 0.2,
+    'balloon-1': 0.17, # 2
+    # 'balloon-0': 0.25,
+    'fish-3': 0.21,
+    'fish-2': 0.2,
+    # 'fish-1': 0.23,
+    'fish-0': 0.18,
+    'boat-3': 0.25,
+    # 'boat-2': 0.006,
+    'boat-1': 0.3,
+    'boat-0': 0.17, # 2
+    'ball-3': 0.2,
+    # 'ball-0': 0.25,
+    # 'ball-2': 0.15,
+    'ball-1': 0.24,
+    'ball-0': 0.23,
+    'else': 0.25
+}
+
+score_dict_1t = {
+    'airplane-3': 0.28,
+    'airplane-0': 0.21, # 23
+    'airplane-1': 0.35, # 35
+    'airplane-2': 0.25,
+    'bird-1': 0.25,
+    # 'bird-0': 0.2,
+    'bird-2': 0.22,
+    'bird-3': 0.25,
+    'person-3': 0.28,
+    'person-1': 0.3, # 25
+    'person-2': 0.4,
+    'person-0': 0.23,
+    'stock-3': 0.28,
+    # 'stock-2': 0.23,
+    'stock-1': 0.28,
+    'stock-0': 0.22,
+    # 'car-0': 0.15,
+    'car-1': 0.3, # 23
+    'car-2': 0.2, # 18
+    # 'car-3': 0.25,
+    'insect-3': 0.3,
+    'insect-2': 0.3,
+    'insect-1': 0.3,
+    # 'insect-0': 0.2,
+    'balloon-3': 0.14, # 15
+    'balloon-2': 0.2,
+    'balloon-1': 0.16, # 2
+    'balloon-0': 0.22,
+    'fish-3': 0.21,
+    'fish-2': 0.23,
+    # 'fish-1': 0.23,
+    'fish-0': 0.18,
+    'boat-3': 0.25,
+    # 'boat-2': 0.006,
+    'boat-1': 0.28,
+    'boat-0': 0.17, # 2
+    'ball-3': 0.2,
+    # 'ball-0': 0.25,
+    # 'ball-2': 0.15,
+    # 'ball-1': 0.25,
+    'ball-0': 0.23,
+    'else': 0.25
+}
 @torch.no_grad()
 def track_test(model, criterion, postprocessors, dataset, base_ds, device, output_dir, tracker, wo_class_error=False, args=None, logger=None):
     model.eval()
@@ -491,15 +673,21 @@ def track_test(model, criterion, postprocessors, dataset, base_ds, device, outpu
     # coco_evaluator = CocoEvaluator(base_ds, iou_types)
     # coco_evaluator.coco_eval[iou_types[0]].params.iouThrs = [0, 0.1, 0.5, 0.75]
 
+    save_path = 'results_1t/'
+
     for seq, template in dataset:
-        txt_name = 'results/' + str(seq) + '.txt'
+        txt_name = save_path + str(seq) + '.txt'
         with open(txt_name, 'w') as f:
             f.close()
         tracker.reset()
         # import pdb;pdb.set_trace()
-        if str(seq) in score_dict.keys():
-            # tracker.detection_person_thresh = score_dict[str(seq)]
-            tracker.detection_person_thresh = 0.25
+        if str(seq) in score_dict_1t.keys():
+            # tracker.detection_person_thresh = score_dict_no[str(seq)]
+            # tracker.detection_person_thresh = score_dict_no[str(seq)]
+            # tracker.detection_person_thresh = score_dict[str(seq)] + 0.05
+            # tracker.detection_person_thresh = score_dict_4t[str(seq)]
+            tracker.detection_person_thresh = score_dict_1t[str(seq)]
+            # tracker.detection_person_thresh = 0.25
             # print(seq, tracker.detection_person_thresh)
         else:
             tracker.detection_person_thresh = score_dict['else']
@@ -530,7 +718,7 @@ def track_test(model, criterion, postprocessors, dataset, base_ds, device, outpu
                 x, y, w, h, s = track[frame_id]
                 x = x - w/2
                 y = y - h/2
-                txt_name = 'results/' + str(seq) + '.txt'
+                txt_name = save_path + str(seq) + '.txt'
                 with open(txt_name, 'a') as f:
                     f.write(('%g,' * 6 + '-1,-1,-1,-1\n') % (frame_id, track_id, x,  # MOT format
                                                        y, w, h))
@@ -566,6 +754,7 @@ class_dict = {"1": "person", "2": "bicycle", "3": "car", "4": "motorcycle",
               "78": "microwave", "79": "oven", "80": "toaster", "81": "sink", 
               "82": "refrigerator", "84": "book", "85": "clock", "86": "vase", 
               "87": "scissors", "88": "teddy bear", "89": "hair drier", "90": "toothbrush"}
+
 @torch.no_grad()
 def ov_test(model, criterion, postprocessors, dataset, data_loader, base_ds, device, output_dir, wo_class_error=False, args=None, logger=None):
     model.eval()
@@ -687,4 +876,112 @@ def ov_test(model, criterion, postprocessors, dataset, data_loader, base_ds, dev
     #     import json
     #     with open(args.output_dir + f'/results_class_all.json', 'w') as f:
     #         json.dump(final_res, f, indent=2)
+    return final_res
+
+
+
+@torch.no_grad()
+def det_with_gtbox(model, criterion, postprocessors, data_loader, base_ds, device, output_dir, wo_class_error=False, args=None, logger=None):
+    model.eval()
+    criterion.eval()
+
+    metric_logger = utils.MetricLogger(delimiter="  ")
+    header = 'Test:'
+
+    iou_types = tuple(k for k in ('segm', 'bbox') if k in postprocessors.keys())
+    panoptic_evaluator = None
+    if 'panoptic' in postprocessors.keys():
+        panoptic_evaluator = PanopticEvaluator(
+            data_loader.dataset.ann_file,
+            data_loader.dataset.ann_folder,
+            output_dir=os.path.join(output_dir, "panoptic_eval"),
+        )
+
+    final_res = []
+    template_box = {}
+
+    # load gt box
+    import json
+    det_results = {}
+    with open('../gmot-main/data/COCO/annotations/gmot_test.json') as f:
+        gmot_det = json.load(f)
+    gmot_det = gmot_det['annotations']
+    for item in gmot_det:
+        image_id = item['image_id']
+        box = item['bbox']
+        if image_id not in det_results.keys():
+            det_results[image_id] = []
+            det_results[image_id].append([box[0]+box[2]/2, box[1]+box[3]/2, box[2], box[3]])
+        else:
+            det_results[image_id].append([box[0]+box[2]/2, box[1]+box[3]/2, box[2], box[3]])
+
+    total_score = 0
+    total_iou = 0
+    total_number = 0
+    for samples, targets, templates in metric_logger.log_every(data_loader, 10, header, logger=logger):  
+        samples = samples.to(device)
+        targets = [{k: to_device(v, device) for k, v in t.items()} for t in targets]
+
+        image_idx = targets[0]['image_id'].item()
+        gt_boxes = det_results[image_idx]
+        image_size = targets[0]['orig_size']
+        gt_tensor = torch.tensor(gt_boxes).cuda()
+        gt_tensor[:, 0] /= image_size[1]
+        gt_tensor[:, 1] /= image_size[0]
+        gt_tensor[:, 2] /= image_size[1]
+        gt_tensor[:, 3] /= image_size[0]
+        num_gt = len(gt_boxes)
+
+        # import pdb; pdb.set_trace()
+        outputs, _ = model(samples, templates, track_pos=gt_tensor)
+
+        gt_outouts = {}
+        for key in outputs.keys():
+            if key in ['pred_logits', 'pred_boxes']:
+                gt_outouts[key] = outputs[key][:, 600:, :]
+        orig_target_sizes = torch.stack([t["orig_size"] for t in targets], dim=0)
+        gt_results, box_index = postprocessors['bbox'](gt_outouts, orig_target_sizes, not_to_xyxy=False)
+                
+        track_scores = gt_results[0]['scores']
+        track_boxes = gt_results[0]['boxes']
+        track_labels = gt_results[0]['labels'].bool()
+        track_scores = track_scores[track_labels]
+        track_boxes = track_boxes[track_labels]
+        box_index = box_index.squeeze(0)[track_labels]
+        # import pdb; pdb.set_trace()
+
+        
+        _scores = track_scores.tolist()
+        _labels = track_labels.tolist()
+        _boxes = track_boxes.tolist()
+        _order = box_index.tolist()
+        # ----------------------------------------------
+        for s, l, b, i in zip(_scores, _labels, _boxes, _order):
+            assert isinstance(l, int)
+            total_number += 1
+            total_score += s
+            order = i % num_gt
+            gt_box = gt_boxes[order]
+            box = torch.tensor([gt_box[0], gt_box[1], gt_box[0]+gt_box[2], gt_box[1]+gt_box[3]])[None, :]
+            pred_box = torch.tensor([b[0], b[1], b[2], b[3]])[None, :]
+            iou = torchvision.ops.box_iou(box, pred_box).item()
+            total_iou += iou
+            # import pdb; pdb.set_trace()
+            itemdict = {
+                    "image_id": int(image_idx), 
+                    "category_id": l, 
+                    "bbox": b, 
+                    "score": s,
+                    "gt": gt_box,
+                    }
+            final_res.append(itemdict)
+
+    avg_score = total_score / total_number
+    avg_iou = total_iou / total_number
+    print('avg_score:{}, avg_iou:{}'.format(avg_score, avg_iou))
+
+    if args.output_dir:
+        import json
+        with open(args.output_dir + f'/results{args.rank}.json', 'w') as f:
+            json.dump(final_res, f)  
     return final_res

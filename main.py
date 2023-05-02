@@ -23,13 +23,14 @@ from models.dino.tracker import Tracker
 import datasets
 import util.misc as utils
 from datasets import build_dataset, get_coco_api_from_dataset
-from engine import evaluate, train_one_epoch, test, track_test, ov_test
+from engine import evaluate, train_one_epoch, test, track_test, ov_test, det_with_gtbox
 import models
 from util.slconfig import DictAction, SLConfig
 from util.utils import ModelEma, BestMetricHolder
 
 from bbox_adjust import bbox_adjustment
 from tools.tools.coco_categories import fitler_coco_category
+from torchreid.utils import FeatureExtractor
 
 def get_args_parser():
     parser = argparse.ArgumentParser('Set transformer detector', add_help=False)
@@ -85,6 +86,8 @@ def get_args_parser():
     parser.add_argument('--test_ov', default=False, action='store_true', help='test ov coco')
     parser.add_argument('--dn_type', default='sample', help='you can chose dsn, dn and no dn')
     parser.add_argument('--number_template', default=2, type=int, help='number of template use in one image')
+    parser.add_argument('--temp_in_image', default=False, type=bool, help='find template in current image')
+    parser.add_argument('--det_with_gt', default=False, type=bool, help='use gt as query box')
 
     # distributed training parameters
     parser.add_argument('--world_size', default=1, type=int,
@@ -216,6 +219,9 @@ def main(args):
     if args.ov_coco:
         dataset_train = build_dataset(image_set='train_ov', args=args)
         dataset_val = build_dataset(image_set='val_ov', args=args)
+    elif args.temp_in_image:
+        dataset_train = build_dataset(image_set='train_cur', args=args)
+        dataset_val = build_dataset(image_set='val', args=args)
     else:
         dataset_train = build_dataset(image_set='train', args=args)
         dataset_val = build_dataset(image_set='val', args=args)
@@ -318,6 +324,16 @@ def main(args):
                                               data_loader_test, base_ds, device, args.output_dir, wo_class_error=wo_class_error, args=args)
         return
     
+    if args.det_with_gt:
+        dataset_test = build_dataset(image_set='test', args=args)
+        sampler_test = torch.utils.data.RandomSampler(dataset_test)
+        batch_sampler_test = torch.utils.data.BatchSampler(sampler_test, args.batch_size, drop_last=True)
+        data_loader_test = DataLoader(dataset_test, batch_sampler=batch_sampler_test,
+                                    collate_fn=utils.collate_fn, num_workers=args.num_workers)
+        test_stats = det_with_gtbox(model, criterion, postprocessors,
+                                              data_loader_test, base_ds, device, args.output_dir, wo_class_error=wo_class_error, args=args)
+        return
+    
     if args.test:
         dataset_test = build_dataset(image_set='test', args=args)
         sampler_test = torch.utils.data.RandomSampler(dataset_test)
@@ -329,7 +345,15 @@ def main(args):
         return
     
     if args.test_track:
-        tracker = Tracker(model, args)
+        reid_model = Path('ckpts/osnet_ain_x1_0_msmt17.pth')
+        assert os.path.isfile(reid_model)
+        reid_network = FeatureExtractor(
+            model_name='osnet_ain_x1_0',
+            model_path=reid_model,
+            verbose=False,
+            device='cuda' if torch.cuda.is_available() else 'cpu')
+
+        tracker = Tracker(model, reid_network, args)
         dataset_test = build_dataset(image_set='test_track', args=args)
         # sampler_test = torch.utils.data.RandomSampler(dataset_test)
         # batch_sampler_test = torch.utils.data.BatchSampler(sampler_test, args.batch_size, drop_last=True)

@@ -560,7 +560,7 @@ class DeformableTransformer(nn.Module):
             if track_pos is not None:
                 track_num = track_pos.shape[0]
                 track_pos = inverse_sigmoid(track_pos)
-                track_refpoint_embed = track_pos[None, :, :].repeat(1, 4, 1)
+                track_refpoint_embed = track_pos[None, :, :].repeat(1, self.template_lvl, 1)
                 # track_refpoint_embed = track_pos[None, :, :]
                 refpoint_embed = torch.cat([refpoint_embed, track_refpoint_embed], dim=1)
                 temp_feat_split = torch.split(template_feature, 1, dim=1)

@@ -79,30 +79,27 @@ class MOTSequence(Dataset):
 
         imDir = osp.join(seq_path, imDir)
         gt_file = osp.join(self._mot_dir, 'annotations', 'gmot_test.json')
-        with open(gt_file) as info:
-            gt = json.load(info)
-        images = gt['images']
-        annotations = gt['annotations']
+        # with open(gt_file) as info:
+        #     gt = json.load(info)
+        # images = gt['images']
+        # annotations = gt['annotations']
         template_image_name = 'gmot/' + self._seq_name + '/img1/000000.jpg'
-        image_id = next(x for x in images if x["file_name"] == template_image_name)['id']
-        template_annos = list(filter(lambda item: item['image_id'] == image_id, annotations))
+        # image_id = next(x for x in images if x["file_name"] == template_image_name)['id']
+        # template_annos = list(filter(lambda item: item['image_id'] == image_id, annotations))
         # template_anno = random.choices(template_annos)
-        if self._seq_name in  ['stock-0', 'balloon-0', 'fish-2', 'ball-2']:
-            template_anno = [template_annos[1]]
-        else:
-            template_anno = [template_annos[int(len(template_annos)/2)-2]]
+        
         template_img_path = osp.join(self._mot_dir, template_image_name)
         img = Image.open(template_img_path).convert("RGB")
-        # import pdb; pdb.set_trace()
+        # # import pdb; pdb.set_trace()
         w, h = img.size
         image_size = [w, h]
-        box = template_anno[0]['bbox']
-        box[2] += box[0]
-        box[3] += box[1]
-        template = img.crop(box)
-        template_path = 'track_vis/template/template_' + self._seq_name + '.jpg'
-        template.save(template_path)
-        
+        # box = template_anno[0]['bbox']
+        # box[2] += box[0]
+        # box[3] += box[1]
+        # template = img.crop(box)
+        # template_path = 'track_vis/template/template_' + self._seq_name + '.jpg'
+        # template.save(template_path)
+        template = Image.open('template/gmot_track/' + seq_name + '.jpg')
         template, _ = T.resize(template, target=None, size=400, max_size=400)
         tran_template = T.Compose([ 
             T.ToTensor(),
@@ -110,13 +107,13 @@ class MOTSequence(Dataset):
         ])
         template, _ = tran_template(template, target=None)
         # vis template feature
-        from torchvision import transforms
-        unloader = transforms.ToPILImage()
-        image = template.cpu().clone()  # clone the tensor
-        image = image.squeeze(0)  # remove the fake batch dimension
-        image = unloader(image)
-        name = 'track_vis/example_' + self._seq_name + '.jpg'
-        image.save(name)
+        # from torchvision import transforms
+        # unloader = transforms.ToPILImage()
+        # image = template.cpu().clone()  # clone the tensor
+        # image = image.squeeze(0)  # remove the fake batch dimension
+        # image = unloader(image)
+        # name = 'track_vis/example_' + self._seq_name + '.jpg'
+        # image.save(name)
 
         gt_file = osp.join(seq_path, 'gt', 'gt.txt')
 

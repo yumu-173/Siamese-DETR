@@ -501,7 +501,11 @@ class CocoDetection(torchvision.datasets.CocoDetection):
             return self.getitem_test(idx)
         elif self.image_set == 'test_ov':
             return self.getitem_test_ov(idx)
+        elif self.image_set == 'train_cur':
+            # use template in current image
+            return self.get_item_ablation2(idx)
         elif self.number_template == 1:
+            # no background class
             return self.get_item_ablation(idx)
         else:
             return self.getitem_train(idx)
@@ -605,7 +609,110 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         # import pdb; pdb.set_trace()
 
         return img, target, return_template_list, self.number_template, temp_cls_list
-    
+
+    def get_item_ablation2(self, idx):
+        try:
+            img, target = super(CocoDetection, self).__getitem__(idx)
+            while len(target) <= 0:
+                idx += 1
+                img, target = super(CocoDetection, self).__getitem__(idx)
+        except:
+            print("Error idx: {}".format(idx))
+            idx += 1
+            img, target = super(CocoDetection, self).__getitem__(idx)
+        image_id = self.ids[idx]
+        # print('template image id:', image_id)
+        for item in target:
+            item['template_id'] = 0
+        target = {'image_id': image_id, 'annotations': target}
+        # --------------------------------------------------------------------------------------------------------------
+        img, target = self.prepare(img, target)
+        image = img
+        if self._transforms is not None:
+            img, target = self._transforms(img, target)
+        # --------------------------------------------------------------------------------------------------------------
+        # import pdb; pdb.set_trace()
+        num = len(target['labels'])
+        while num == 0:
+            idx += 1
+            img, target = super(CocoDetection, self).__getitem__(idx)
+            image_id = self.ids[idx]
+            # print('template image id:', image_id)
+            for item in target:
+                item['template_id'] = 0
+            target = {'image_id': image_id, 'annotations': target}
+            # --------------------------------------------------------------------------------------------------------------
+            img, target = self.prepare(img, target)
+            if self._transforms is not None:
+                img, target = self._transforms(img, target)
+            # --------------------------------------------------------------------------------------------------------------
+            num = len(target['labels'])
+        template_list = []
+        temp_cls_list = []
+        if num == 1:
+            temp_idx = 0
+        else:
+            temp_idx = np.random.randint(0, num - 1)
+        template_class = target['labels'][temp_idx].item()
+        temp_cls_list.append(template_class)
+        template_anno = deepcopy(target['boxes']).tolist()
+        if len(template_anno) > 1:
+            box = deepcopy(template_anno[np.random.randint(0, max(len(template_anno) - 1, 0))])
+        else:
+            box = deepcopy(template_anno[0])
+        size = target['size'].tolist()
+        # import pdb; pdb.set_trace()
+        box[0] *= size[1]
+        box[1] *= size[0]
+        box[2] *= size[1]
+        box[3] *= size[0]
+
+        box[0] -= box[2]/2
+        box[1] -= box[3]/2
+        box[2] += box[0]
+        box[3] += box[1]
+        # import pdb; pdb.set_trace()
+        template = image.crop(box)
+        template_list.append(template)
+        
+        return_template_list = []
+        tran_template = T.Compose([ 
+            T.ToTensor(),
+            T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+        ])
+        for template in template_list:    
+            template, _ = T.resize(template, target=None, size=400, max_size=400)
+            template, _ = tran_template(template, target)
+            return_template_list.append(template)
+        if self.aux_target_hacks is not None:
+            for hack_runner in self.aux_target_hacks:
+                target, img = hack_runner(target, img=img)
+
+        # split target into bs*template_num
+        new_targets = []
+        for num in range(self.number_template):
+            new_t = {}
+            # import pdb; pdb.set_trace()
+            keep = target['template_id']==num
+            # import pdb; pdb.set_trace()
+            for key in target.keys():
+                if key in ['boxes', 'labels', 'iscrowd', 'area', 'template_id']:
+                    new_t[key] = target[key][keep]
+                    # targets[key] = targets[key][keep]
+                else:
+                    new_t[key] = target[key]
+            new_targets.append(new_t)
+        target = new_targets
+        new_label = []
+        for label in target[0]['labels']:
+            if label == template_class:
+                new_label.append(1)
+            else:
+                new_label.append(0)
+        target[0]['labels'] = torch.tensor(new_label)
+        # import pdb; pdb.set_trace()
+        return img, target, return_template_list, self.number_template, temp_cls_list
+
     def getitem_test_ov(self, idx):
         try:
             img, target = super(CocoDetection, self).__getitem__(idx)
@@ -650,7 +757,10 @@ class CocoDetection(torchvision.datasets.CocoDetection):
                     # template = Image.open('template/gmot2/' + key +'.jpg')
                     
                     # template group 3
-                    template = Image.open('template/gmot3/' + key +'.jpg')
+                    # template = Image.open('template/gmot3/' + key +'.jpg')
+
+                    # template group track
+                    template = Image.open('template/gmot_track/' + key +'.jpg')
 
                     # save template id
                     # with open('template/group3.txt', 'a') as f:
@@ -943,7 +1053,7 @@ def convert_coco_poly_to_mask(segmentations, height, width):
     return masks
 
 
-class ConvertCocoPolysToMask(object):
+class ConvertCocoPolysToMask(object): 
     def __init__(self, return_masks=False, image_set='train'):
         self.return_masks = return_masks
         self.image_set = image_set
@@ -960,7 +1070,7 @@ class ConvertCocoPolysToMask(object):
 
         boxes = [obj["bbox"] for obj in anno]
 
-        if self.image_set in ['train', 'train_ov', 'val_ov', 'val']:
+        if self.image_set in ['train', 'train_ov', 'val_ov', 'val', 'train_cur']:
             template = [obj["template_id"] for obj in anno]
             template = torch.tensor(template, dtype=torch.int64)
         # print('template_id', template)
@@ -988,7 +1098,7 @@ class ConvertCocoPolysToMask(object):
         keep = (boxes[:, 3] > boxes[:, 1]) & (boxes[:, 2] > boxes[:, 0])
         boxes = boxes[keep]
         classes = classes[keep]
-        if self.image_set in ['train', 'train_ov', 'val_ov', 'val']:
+        if self.image_set in ['train', 'train_ov', 'val_ov', 'val', 'train_cur']:
             template = template[keep]
         # import pdb; pdb.set_trace()
         if self.return_masks:
@@ -1002,7 +1112,7 @@ class ConvertCocoPolysToMask(object):
         if self.return_masks:
             target["masks"] = masks
         target["image_id"] = image_id
-        if self.image_set in ['train', 'train_ov', 'val_ov', 'val']:
+        if self.image_set in ['train', 'train_ov', 'val_ov', 'val', 'train_cur']:
             target["template_id"] = template
         if keypoints is not None:
             target["keypoints"] = keypoints
@@ -1161,7 +1271,7 @@ def make_coco_transforms(image_set, fix_size=False, strong_aug=False, args=None)
             normalize,
         ])
 
-    if image_set in ['val', 'eval_debug', 'train_adj', 'test', 'train_ov', 'val_ov', 'test_ov']:
+    if image_set in ['val', 'eval_debug', 'train_adj', 'test', 'train_ov', 'val_ov', 'test_ov', 'train_cur']:
 
         if os.environ.get("GFLOPS_DEBUG_SHILONG", False) == 'INFO':
             print("Under debug mode for flops calculation only!!!!!!!!!!!!!!!!")
@@ -1249,6 +1359,7 @@ def build(image_set, args):
     PATHS = {
         "train": (root / 'train2017', root / "annotations" / f'{mode}_train2017.json'),
         "train_ov": (root / 'train2017', ov_root / "annotations" / f'{mode}_ov_train2017.json'),
+        "train_cur": (root / 'train2017', root / "annotations" / f'{mode}_train2017.json'),
         "train_adj": (root, root / "annotations" / f'fsc_adj.json'),
         "test":(gmot_root, gmot_root / 'annotations' / 'gmot_test.json'),
         "test_track":(gmot_root, gmot_root / 'annotations' / 'gmot_test.json'),

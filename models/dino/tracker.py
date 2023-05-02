@@ -1,11 +1,13 @@
 from collections import deque
 
 import cv2
+import json
 import numpy as np
 import torch
 from scipy.optimize import linear_sum_assignment
 from torchreid import metrics
 from torchvision.ops.boxes import clip_boxes_to_image, nms
+import torchvision
 from copy import deepcopy
 
 from .utils_track import (bbox_overlaps, get_center, get_height, get_width, make_pos,
@@ -17,11 +19,12 @@ class Tracker:
     # only track pedestrian
     cl = 1
 
-    def __init__(self, obj_detect, tracker_cfg):
+    def __init__(self, obj_detect, reid_network, tracker_cfg):
         self.obj_detect = obj_detect
-        # self.reid_network = reid_network
+        self.reid_network = reid_network
         self.detection_person_thresh = tracker_cfg.detection_person_thresh
         self.regression_person_thresh = tracker_cfg.regression_person_thresh
+        self.regression_iou_thresh = tracker_cfg.regression_iou_thresh
         self.detection_nms_thresh = tracker_cfg.detection_nms_thresh
         self.regression_nms_thresh = tracker_cfg.regression_nms_thresh
         self.public_detections = tracker_cfg.public_detections
@@ -45,6 +48,23 @@ class Tracker:
 
         self.frame_range = tracker_cfg.frame_range
         self.num_queries = tracker_cfg.num_queries
+
+        self.load_results =tracker_cfg.load_results
+        if self.load_results:
+            self.det_results = {}
+            with open('logs/DINO/R50-MS4-1/results_gmotdet_name.json') as f:
+                gmot_det = json.load(f)
+            for item in gmot_det:
+                seq_name = item['image_id'].split('/')[-3]
+                frame_id = int(item['image_id'].split('/')[-1][:-4])
+                box = item['bbox']
+                if seq_name not in self.det_results.keys():
+                    self.det_results[seq_name] = {}
+                if frame_id not in self.det_results[seq_name].keys():
+                    self.det_results[seq_name][frame_id] = []
+                    self.det_results[seq_name][frame_id].append([box[0]+box[2]/2, box[1]+box[3]/2, box[2], box[3]])
+                else:
+                    self.det_results[seq_name][frame_id].append([box[0]+box[2]/2, box[1]+box[3]/2, box[2], box[3]])
 
     def reset(self, hard=True):
         self.tracks = []
@@ -93,10 +113,22 @@ class Tracker:
         boxes_order = torch.zeros((pos_num, 4)).cuda()
         scores_order = torch.zeros(pos_num).cuda()
         for box, score, idx in zip(pos, scores, boxes_index):
+            iou_thresh = self.regression_iou_thresh
             order = idx % pos_num
             # print(order)
-            if score > scores_order[order]:
-                scores_order[order] = score
+            t = self.tracks[order]
+            track_pos = deepcopy(t.pos)
+            track_pos[:,0] = track_pos[:,0] - track_pos[:,2]/2
+            track_pos[:,1] = track_pos[:,1] - track_pos[:,3]/2
+            track_pos[:,2] = track_pos[:,0] + track_pos[:,2]
+            track_pos[:,3] = track_pos[:,1] + track_pos[:,3]
+            # import pdb; pdb.set_trace()
+            iou = torchvision.ops.box_iou(track_pos, box[None, :]).view(-1).item()
+            if iou <= self.regression_iou_thresh:
+                scores_order[order] = 0
+            elif iou > iou_thresh:
+                iou_thresh = iou
+                scores_order[order] = self.regression_person_thresh + 1e-5
                 boxes_order[order] = box
 
         pos = boxes_order
@@ -161,7 +193,7 @@ class Tracker:
 
     def reid(self, blob, new_det_pos, new_det_scores):
         """Tries to ReID inactive tracks with new detections."""
-        new_det_features = [torch.zeros(0).cuda() for _ in range(len(new_det_pos))]
+        # new_det_features = [torch.zeros(0).cuda() for _ in range(len(new_det_pos))]
 
         if self.do_reid:
             # new_det_features = self.get_appearances(blob, new_det_pos)
@@ -170,8 +202,8 @@ class Tracker:
                 # calculate appearance distances
                 dist_mat, pos = [], []
                 for t in self.inactive_tracks:
-                    # dist_mat.append(torch.cat([t.test_features(feat.view(1, -1))
-                    #                            for feat in new_det_features], dim=1))
+                #     dist_mat.append(torch.cat([t.test_features(feat.view(1, -1))
+                #                                for feat in new_det_features], dim=1))
                     pos.append(t.pos)
                 if len(pos) > 1:
                     # dist_mat = torch.cat(dist_mat, 0)
@@ -196,6 +228,7 @@ class Tracker:
                 assigned = []
                 remove_inactive = []
                 for r, c in zip(row_ind, col_ind):
+                    # import pdb; pdb.set_trace()
                     if dist_mat[r, c] <= self.reid_sim_threshold:
                         t = self.inactive_tracks[r]
                         self.tracks.append(t)
@@ -226,10 +259,11 @@ class Tracker:
         """Uses the siamese CNN to get the features for all active tracks."""
         crops = []
         for r in pos:
-            x0 = int(r[0])
-            y0 = int(r[1])
-            x1 = int(r[2])
-            y1 = int(r[3])
+            # import pdb; pdb.set_trace()
+            x0 = max(int(r[0]-r[2]/2), 0)
+            y0 = max(int(r[1]-r[3]/2), 0)
+            x1 = min(int(r[2]/2+r[0]), blob['img'].shape[3]-1)
+            y1 = min(int(r[3]/2+r[1]), blob['img'].shape[2]-1)
             if x0 == x1:
                 if x0 != 0:
                     x0 -= 1
@@ -241,6 +275,7 @@ class Tracker:
                 else:
                     y1 += 1
             crop = blob['img'][0, :, y0:y1, x0:x1].permute(1, 2, 0)
+            # import pdb; pdb.set_trace()
             crops.append(crop.mul(255).numpy().astype(np.uint8))
 
         new_features = self.reid_network(crops)
@@ -360,7 +395,19 @@ class Tracker:
             labels = det_results[0]['labels'].bool()
             scores = scores[labels]
             boxes = boxes[labels]
-            # import pdb; pdb.set_trace()
+            
+
+            if self.load_results:
+                image_name = blob['img_path'][0]
+                # import pdb; pdb.set_trace()
+                seq_name = image_name.split('/')[-3]
+                frame_id = int(image_name.split('/')[-1][:-4])
+                if frame_id in self.det_results[seq_name].keys():
+                    boxes = torch.tensor(self.det_results[seq_name][frame_id]).cuda()
+                    scores = torch.ones(boxes.shape[0]).cuda()
+                else:
+                    scores = torch.zeros(boxes.shape[0]).cuda()
+                # import pdb; pdb.set_trace()
 
         if boxes.nelement() > 0:
             boxes = clip_boxes_to_image(boxes, blob['img'].shape[-2:])
@@ -459,6 +506,7 @@ class Tracker:
             # try to reidentify tracks
             # import pdb; pdb.set_trace()
             new_det_pos, new_det_scores = self.reid(blob, new_det_pos, new_det_scores)
+            # import pdb; pdb.set_trace()
             # new_det_pos, new_det_scores, new_det_features = self.reid(blob, new_det_pos, new_det_scores)
 
             # add new
@@ -491,7 +539,8 @@ class Tracker:
         img = cv2.imread(path, 1)
         # for bbox in self.get_pos():
         #     cv2.rectangle(img, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (0, 255, 0), 1)
-        for bbox in self.get_pos():
+        for i, bbox in enumerate(self.get_pos()):
+            cv2.putText(img, str(self.tracks[i].id), (int(bbox[0]-bbox[2]/2), int(bbox[1]-bbox[3]/2)), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 255), 1)
             cv2.rectangle(img, (int(bbox[0]-bbox[2]/2), int(bbox[1]-bbox[3]/2)), (int(bbox[0]+bbox[2]/2), int(bbox[1]+bbox[3]/2)), (0, 0, 255), 1)
         
         import os

@@ -17,7 +17,7 @@ class GMOT40Wrapper(Dataset):
 		dataloader -- args for the MOT_Sequence dataloader
 		"""
 		mot_dir = '../gmot-main/data/COCO/'
-		# test_sequences = ['ball-0']
+		# test_sequences = ['stock-1']
 		test_sequences = ['airplane-0', 'airplane-1', 'airplane-2', 'airplane-3', 
 		        'ball-0', 'ball-1', 'ball-2', 'ball-3',
 			    'balloon-0', 'balloon-1', 'balloon-2', 'balloon-3',
