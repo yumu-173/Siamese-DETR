@@ -917,13 +917,15 @@ def det_with_gtbox(model, criterion, postprocessors, data_loader, base_ds, devic
 
     total_score = 0
     total_iou = 0
-    total_number = 0
+    total_number_iou = 0
+    total_number_score = 0
     for samples, targets, templates in metric_logger.log_every(data_loader, 10, header, logger=logger):  
         samples = samples.to(device)
         targets = [{k: to_device(v, device) for k, v in t.items()} for t in targets]
 
         image_idx = targets[0]['image_id'].item()
         gt_boxes = det_results[image_idx]
+
         image_size = targets[0]['orig_size']
         gt_tensor = torch.tensor(gt_boxes).cuda()
         gt_tensor[:, 0] /= image_size[1]
@@ -956,16 +958,32 @@ def det_with_gtbox(model, criterion, postprocessors, data_loader, base_ds, devic
         _boxes = track_boxes.tolist()
         _order = box_index.tolist()
         # ----------------------------------------------
+        temp_iou = {}
+        temp_score = {}
         for s, l, b, i in zip(_scores, _labels, _boxes, _order):
             assert isinstance(l, int)
-            total_number += 1
-            total_score += s
+            # total_number += 1
+            # total_score += s
             order = i % num_gt
             gt_box = gt_boxes[order]
             box = torch.tensor([gt_box[0], gt_box[1], gt_box[0]+gt_box[2], gt_box[1]+gt_box[3]])[None, :]
             pred_box = torch.tensor([b[0], b[1], b[2], b[3]])[None, :]
             iou = torchvision.ops.box_iou(box, pred_box).item()
-            total_iou += iou
+            # total_iou += iou
+            if order not in temp_iou.keys():
+                temp_iou[order] = iou
+                temp_score[order] = s
+            else:
+                # if s > temp_score[order]:
+                #     temp_score[order] = s
+                if iou > temp_iou[order]:
+                    temp_iou[order] = iou
+                    # temp_score[order] = s
+                if s > temp_score[order]:
+                    temp_score[order] = s
+                # elif iou == temp_iou[order]:
+                #     if s > temp_score[order]:
+                #         temp_score[order] = s
             # import pdb; pdb.set_trace()
             itemdict = {
                     "image_id": int(image_idx), 
@@ -975,9 +993,16 @@ def det_with_gtbox(model, criterion, postprocessors, data_loader, base_ds, devic
                     "gt": gt_box,
                     }
             final_res.append(itemdict)
+        # import pdb; pdb.set_trace()
+        for key in temp_iou.keys():
+            total_iou += temp_iou[key]
+        for key in temp_score.keys():
+            total_score += temp_score[key]
+        total_number_iou += len(temp_iou.keys())
+        total_number_score += len(temp_score.keys())
 
-    avg_score = total_score / total_number
-    avg_iou = total_iou / total_number
+    avg_score = total_score / total_number_score
+    avg_iou = total_iou / total_number_iou
     print('avg_score:{}, avg_iou:{}'.format(avg_score, avg_iou))
 
     if args.output_dir:

@@ -1,7 +1,7 @@
 _base_ = ['coco_transformer.py']
 
 num_classes = 2
-template_lvl = 1
+template_lvl = 2
 # number_template = 1
 
 lr = 0.0001
