@@ -5,7 +5,7 @@ import json
 import numpy as np
 import torch
 from scipy.optimize import linear_sum_assignment
-from torchreid import metrics
+# from torchreid import metrics
 from torchvision.ops.boxes import clip_boxes_to_image, nms
 import torchvision
 from copy import deepcopy
