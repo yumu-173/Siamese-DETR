@@ -23,7 +23,7 @@ from models.dino.tracker import Tracker
 import datasets
 import util.misc as utils
 from datasets import build_dataset, get_coco_api_from_dataset
-from engine import evaluate, train_one_epoch, test, track_test, ov_test, det_with_gtbox
+from engine import evaluate, train_one_epoch, test, track_test, ov_test, det_with_gtbox, test_panda
 import models
 from util.slconfig import DictAction, SLConfig
 from util.utils import ModelEma, BestMetricHolder
@@ -88,6 +88,7 @@ def get_args_parser():
     parser.add_argument('--number_template', default=2, type=int, help='number of template use in one image')
     parser.add_argument('--temp_in_image', default=False, type=bool, help='find template in current image')
     parser.add_argument('--det_with_gt', default=False, type=bool, help='use gt as query box')
+    parser.add_argument('--test_panda', default=False, action='store_true', help='test panda')
 
     # distributed training parameters
     parser.add_argument('--world_size', default=1, type=int,
@@ -342,6 +343,19 @@ def main(args):
                                     collate_fn=utils.collate_fn, num_workers=args.num_workers)
         test_stats = test(model, criterion, postprocessors,
                                               data_loader_test, base_ds, device, args.output_dir, wo_class_error=wo_class_error, args=args)
+        return
+    
+    if args.test_panda:
+        start = time.time()
+        dataset_test = build_dataset(image_set='panda', args=args)
+        sampler_test = torch.utils.data.RandomSampler(dataset_test)
+        batch_sampler_test = torch.utils.data.BatchSampler(sampler_test, args.batch_size, drop_last=True)
+        data_loader_test = DataLoader(dataset_test, batch_sampler=batch_sampler_test,
+                                    collate_fn=utils.collate_fn, num_workers=args.num_workers)
+        test_stats = test_panda(model, criterion, postprocessors,
+                                              data_loader_test, base_ds, device, args.output_dir, wo_class_error=wo_class_error, args=args)
+        end = time.time()
+        print('every image cost {}s'.format((end - start)))
         return
     
     if args.test_track:

@@ -99,7 +99,9 @@ class MOTSequence(Dataset):
         # template = img.crop(box)
         # template_path = 'track_vis/template/template_' + self._seq_name + '.jpg'
         # template.save(template_path)
-        template = Image.open('template/gmot_track/' + seq_name + '.jpg')
+        # template = Image.open('template/gmot_track/' + seq_name + '.jpg')
+        # template = Image.open('template/gmot2/' + seq_name + '.jpg')
+        template = Image.open('template/gmot1/' + seq_name + '.jpg')
         template, _ = T.resize(template, target=None, size=400, max_size=400)
         tran_template = T.Compose([ 
             T.ToTensor(),

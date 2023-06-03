@@ -18,6 +18,7 @@ import tqdm
 import cv2
 from collections import Counter
 import matplotlib.pyplot as plt
+import datasets.transforms as T
 
 import util.misc as utils
 from datasets.coco_eval import CocoEvaluator
@@ -659,6 +660,52 @@ score_dict_1t = {
     'ball-0': 0.23,
     'else': 0.25
 }
+
+score_dict_ft = {
+    'airplane-3': 0.3,
+    'airplane-0': 0.23, # 23
+    'airplane-1': 0.35, # 35
+    'airplane-2': 0.28,
+    'bird-1': 0.25,
+    # 'bird-0': 0.2,
+    'bird-2': 0.3,
+    # 'bird-3': 0.3,
+    'person-3': 0.3,
+    'person-1': 0.3, # 25
+    'person-2': 0.4,
+    'person-0': 0.23,
+    'stock-3': 0.35,
+    # 'stock-2': 0.23,
+    'stock-1': 0.3,
+    'stock-0': 0.22,
+    # 'car-0': 0.15,
+    'car-1': 0.43, # 23
+    'car-2': 0.3, # 18
+    # 'car-3': 0.25,
+    'insect-3': 0.3,
+    'insect-2': 0.3,
+    # 'insect-1': 0.3, ####25
+    # 'insect-0': 0.2,
+    'balloon-3': 0.13, # 15
+    'balloon-2': 0.2,
+    'balloon-1': 0.15, # 2
+    # 'balloon-0': 0.25,
+    'fish-3': 0.21, ####23
+    'fish-2': 0.23,
+    # 'fish-1': 0.23,
+    # 'fish-0': 0.23,
+    'boat-3': 0.27,
+    # 'boat-2': 0.006,
+    'boat-1': 0.33,
+    'boat-0': 0.2, # 2
+    # 'ball-3': 0.18,
+    # 'ball-0': 0.25,
+    # 'ball-2': 0.15,
+    # 'ball-1': 0.23, ####25
+    # 'ball-0': 0.009,
+    'else': 0.25
+}
+
 @torch.no_grad()
 def track_test(model, criterion, postprocessors, dataset, base_ds, device, output_dir, tracker, wo_class_error=False, args=None, logger=None):
     model.eval()
@@ -673,7 +720,7 @@ def track_test(model, criterion, postprocessors, dataset, base_ds, device, outpu
     # coco_evaluator = CocoEvaluator(base_ds, iou_types)
     # coco_evaluator.coco_eval[iou_types[0]].params.iouThrs = [0, 0.1, 0.5, 0.75]
 
-    save_path = 'results_1t/'
+    save_path = 'results_ft/'
 
     for seq, template in dataset:
         txt_name = save_path + str(seq) + '.txt'
@@ -681,12 +728,12 @@ def track_test(model, criterion, postprocessors, dataset, base_ds, device, outpu
             f.close()
         tracker.reset()
         # import pdb;pdb.set_trace()
-        if str(seq) in score_dict_1t.keys():
+        if str(seq) in score_dict_ft.keys():
             # tracker.detection_person_thresh = score_dict_no[str(seq)]
             # tracker.detection_person_thresh = score_dict_no[str(seq)]
-            # tracker.detection_person_thresh = score_dict[str(seq)] + 0.05
+            tracker.detection_person_thresh = score_dict_ft[str(seq)]
             # tracker.detection_person_thresh = score_dict_4t[str(seq)]
-            tracker.detection_person_thresh = score_dict_1t[str(seq)]
+            # tracker.detection_person_thresh = score_dict_1t[str(seq)]
             # tracker.detection_person_thresh = 0.25
             # print(seq, tracker.detection_person_thresh)
         else:
@@ -878,8 +925,6 @@ def ov_test(model, criterion, postprocessors, dataset, data_loader, base_ds, dev
     #         json.dump(final_res, f, indent=2)
     return final_res
 
-
-
 @torch.no_grad()
 def det_with_gtbox(model, criterion, postprocessors, data_loader, base_ds, device, output_dir, wo_class_error=False, args=None, logger=None):
     model.eval()
@@ -1005,6 +1050,159 @@ def det_with_gtbox(model, criterion, postprocessors, data_loader, base_ds, devic
     avg_iou = total_iou / total_number_iou
     print('avg_score:{}, avg_iou:{}'.format(avg_score, avg_iou))
 
+    if args.output_dir:
+        import json
+        with open(args.output_dir + f'/results{args.rank}.json', 'w') as f:
+            json.dump(final_res, f)  
+    return final_res
+
+@torch.no_grad()
+def test_panda(model, criterion, postprocessors, data_loader, base_ds, device, output_dir, wo_class_error=False, args=None, logger=None):
+    model.eval()
+    criterion.eval()
+
+    metric_logger = utils.MetricLogger(delimiter="  ")
+    # if not wo_class_error:
+    #     metric_logger.add_meter('class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
+    header = 'Test:'
+
+    iou_types = tuple(k for k in ('segm', 'bbox') if k in postprocessors.keys())
+    # coco_evaluator = CocoEvaluator(base_ds, iou_types)
+    # coco_evaluator.coco_eval[iou_types[0]].params.iouThrs = [0, 0.1, 0.5, 0.75]
+
+    panoptic_evaluator = None
+    if 'panoptic' in postprocessors.keys():
+        panoptic_evaluator = PanopticEvaluator(
+            data_loader.dataset.ann_file,
+            data_loader.dataset.ann_folder,
+            output_dir=os.path.join(output_dir, "panoptic_eval"),
+        )
+
+    final_res = []
+    template_box = {}
+    for sample, targets, templates, image in metric_logger.log_every(data_loader, 10, header, logger=logger):
+        total_scores = []
+        total_labels = []
+        total_bboxes = []
+        batch_list = []
+        sample = sample.to(device)
+        targets = [{k: to_device(v, device) for k, v in t.items()} for t in targets]
+        # import pdb; pdb.set_trace()
+        image = image[0]
+        size = image.size
+        scales = [[2000, 1200], [4000, 2400], [6000, 3600], [10000, 6000]]
+        
+        for scale in scales:
+            if scale[0] <= 2000:
+                overlap = 0.8
+            elif scale[0] > 2000 and scale[0] <= 7000:
+                overlap = 0.6
+            else:
+                overlap = 0.5
+            y_length = int(size[1] // (scale[1] * overlap))
+            # import pdb; pdb.set_trace()
+            for j in range(y_length):
+                x_length = int(size[0] // (scale[0] * overlap))
+                # import pdb; pdb.set_trace()
+                y_begin = scale[1] * overlap * j
+                if scale[1] <= 2000 and y_begin > size[1] / 2:
+                    break
+                elif scale[1] <= 5000 and y_begin > size[1] / 4 * 3:
+                    break
+                y_end = y_begin + scale[1]
+                if y_end > image.size[1]:
+                    y_end = image.size[1]
+                    j = y_length
+                for k in range(x_length):
+                    x_begin = scale[0] * overlap * k
+                    x_end = scale[0] + x_begin
+                    if x_end > image.size[0]:
+                        x_end = image.size[0]
+                    box = (x_begin, y_begin, x_end, y_end)
+                    image_seg = image.crop(box)
+
+                    scale_x = image_seg.size[0]
+                    scale_y = image_seg.size[1]
+
+                    image_seg, _ = T.resize(image_seg, target=None, size=1920, max_size=1920)
+                    transform = T.Compose([
+                        # T.RandomResize([800], max_size=1333),
+                        T.ToTensor(),
+                        T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+                    ])
+                    image_pred, _ = transform(image_seg, None)
+                    batch_list.append(image_pred.cuda())
+                    # if len(batch_list) == 8 or (j == y_length-1 and k == x_length-1):
+                    templates *= len(batch_list)
+                    # import pdb; pdb.set_trace()
+                    outputs, _ = model(batch_list, templates)
+                    batch_list = []
+                    # orig_target_sizes = torch.stack([t["orig_size"] for t in targets], dim=0)
+                    # import pdb; pdb.set_trace()
+                    orig_target_sizes = torch.tensor([[scale_y, scale_x]]).cuda()
+                    results = postprocessors['bbox'](outputs, orig_target_sizes, not_to_xyxy=False)
+
+                    res = {target['image_id'].item(): output for target, output in zip(targets, results)}
+
+                    for image_id, outputs in res.items():
+                        _scores = outputs['scores']
+                        _labels = outputs['labels']
+                        _boxes = outputs['boxes']
+                        # ------------------ keep person -----------------------
+                        keep = _labels.bool()
+                        _boxes = _boxes[keep]
+                        _scores = _scores[keep]
+                        _labels = _labels[keep]
+                        # ------------------ NMS -----------------------
+                        box = torch.zeros_like(_boxes)
+                        box[:, :2] = _boxes[:, :2] - (_boxes[:, 2:] / 2)
+                        box[:, 2:] = _boxes[:, :2] + (_boxes[:, 2:] / 2)
+                        keep = torchvision.ops.nms(box, _scores, 0.8)
+                        _boxes = _boxes[keep].tolist()
+                        _labels = _labels[keep].tolist()
+                        _scores = _scores[keep].tolist()
+                        # ----------------------------------------------
+                        
+                        for s, l, box in zip(_scores, _labels, _boxes):
+                            # import pdb; pdb.set_trace()
+                            if box[0] <= 15 or box[1] <= 15 or box[2] >= scale_x-15 or box[3] >= scale_y-15:
+                                if box[0] <= 15 and x_begin != 0:
+                                    continue
+                                elif box[1] <= 15 and y_begin != 0:
+                                    continue
+                                elif box[2] >= scale_x-15 and x_end != image.size[1]:
+                                    continue
+                                elif box[3] >= scale_y-15 and y_end != image.size[0]:
+                                    continue
+
+                            box[0] = box[0] + x_begin
+                            box[1] = box[1] + y_begin
+                            box[2] = box[2] + x_begin
+                            box[3] = box[3] + y_begin
+                            assert isinstance(l, int)
+                            total_scores.append(s)
+                            total_labels.append(l)
+                            total_bboxes.append(box)
+        total_bboxes = torch.tensor(total_bboxes).cuda()
+        total_scores = torch.tensor(total_scores).cuda()
+        # import pdb; pdb.set_trace()
+        keep = torchvision.ops.nms(total_bboxes, total_scores, 0.8)
+        total_labels = torch.tensor(total_labels).cuda()
+        # total_scores = torch.tensor(total_scores)
+
+        total_bboxes = total_bboxes[keep].tolist()
+        total_labels = total_labels[keep].tolist()
+        total_scores = total_scores[keep].tolist()
+        image_id = targets[0]['image_id']
+        for s, l, b in zip(total_scores, total_labels, total_bboxes):
+            assert isinstance(l, int)
+            itemdict = {
+                    "image_id": int(image_id), 
+                    "category_id": l, 
+                    "bbox": b, 
+                    "score": s,
+                    }
+            final_res.append(itemdict)
     if args.output_dir:
         import json
         with open(args.output_dir + f'/results{args.rank}.json', 'w') as f:

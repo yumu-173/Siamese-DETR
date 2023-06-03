@@ -29,6 +29,9 @@ from collections import Counter
 import torchvision.transforms as standard_transforms
 import matplotlib.pyplot as plt
 from PIL import Image
+from PIL import ImageFile
+ImageFile.LOAD_TRUNCATED_IMAGES = True
+Image.MAX_IMAGE_PIXELS = None
 
 from .gmot_wrapper import GMOT40Wrapper
 
@@ -434,7 +437,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
             # exit(0)
         
     def get_ov_template(self):
-        template_number = 10
+        template_number = 3
         # import pdb; pdb.set_trace()
         for key in self.class_dict.keys():
             templates = []
@@ -449,7 +452,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
                         box[2] += box[0]
                         box[3] += box[1]
                         template = img.crop(box)
-                        template_path = 'ov_vis/100templates/template_' + str(key) + '_' + str(image_id) +  '.jpg'
+                        template_path = 'ov_vis/templates/template_' + str(key) + '_' + str(image_id) +  '.jpg'
                         template.save(template_path)
                         # import pdb; pdb.set_trace()
                         template, _ = T.resize(template, target=None, size=400, max_size=400)
@@ -458,12 +461,12 @@ class CocoDetection(torchvision.datasets.CocoDetection):
                             T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
                         ])
                         template, _ = tran_template(template, target)
-                        from torchvision import transforms
-                        unloader = transforms.ToPILImage()
-                        image = template.cpu().clone()  # clone the tensor
-                        image = image.squeeze(0)  # remove the fake batch dimension
-                        image = unloader(image)
-                        name = 'ov_vis/template/example_' + str(key) + '_' + str(image_id) + '.jpg'
+                        # from torchvision import transforms
+                        # unloader = transforms.ToPILImage()
+                        # image = template.cpu().clone()  # clone the tensor
+                        # image = image.squeeze(0)  # remove the fake batch dimension
+                        # image = unloader(image)
+                        # name = 'ov_vis/template/example_' + str(key) + '_' + str(image_id) + '.jpg'
                         # image.save(name)
                         templates.append(template)
                         # self.template_list[key] = [template]
@@ -472,7 +475,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
                     else:
                         pass
                 if len(templates) == template_number:
-                    self.template_list[key] = templates
+                    self.template_list[key] = [templates[-1]]
                     break
 
     def get_class_weight(self):
@@ -488,7 +491,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         # plt.bar(x_value, y_value, width=0.8, bottom=None)
         # plt.savefig('template/coco_class_hist.png')
         # exit(0)
-
+        # import pdb; pdb.set_trace()
         for i in counter:
             self.class_weight[i] = 1/(counter[i]/len(category_list))
 
@@ -499,6 +502,8 @@ class CocoDetection(torchvision.datasets.CocoDetection):
     def __getitem__(self, idx):
         if self.image_set == 'test':
             return self.getitem_test(idx)
+        elif self.image_set == 'panda':
+            return self.getitem_panda(idx)
         elif self.image_set == 'test_ov':
             return self.getitem_test_ov(idx)
         elif self.image_set == 'train_cur':
@@ -1035,6 +1040,44 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         # import pdb; pdb.set_trace()
         return img, target, return_template_list, num_template, temp_cls_list
 
+    def getitem_panda(self, idx):
+        try:
+            img, target = super(CocoDetection, self).__getitem__(idx)
+        except:
+            print("Error idx: {}".format(idx))
+            idx += 1
+            img, target = super(CocoDetection, self).__getitem__(idx)
+        image_id = self.ids[idx]
+        # print('template image id:', image_id)
+        target = {'image_id': image_id, 'annotations': target}
+
+        template_anno = random.choice(target['annotations'])
+        box = deepcopy(template_anno['bbox'])
+        while box[2] < 0 or box[3] < 0:
+            template_anno = random.choice(target['annotations'])
+            box = deepcopy(template_anno['bbox'])
+        box[2] += box[0]
+        box[3] += box[1]
+        template = img.crop(box)
+
+        image, target = self.prepare(img, target)
+        if self._transforms is not None:
+            image, target = self._transforms(img, target)
+
+            template, _ = T.resize(template, target=None, size=400, max_size=400)
+            tran_template = T.Compose([ 
+                T.ToTensor(),
+                T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+            ])
+            # img, _ = tran_template(img, target)
+            template, _ = tran_template(template, target)
+            # import pdb; pdb.set_trace()
+
+        if self.aux_target_hacks is not None:
+            for hack_runner in self.aux_target_hacks:
+                target, img = hack_runner(target, img=img)
+
+        return image, target, [template], img
 
 def convert_coco_poly_to_mask(segmentations, height, width):
     masks = []
@@ -1271,7 +1314,7 @@ def make_coco_transforms(image_set, fix_size=False, strong_aug=False, args=None)
             normalize,
         ])
 
-    if image_set in ['val', 'eval_debug', 'train_adj', 'test', 'train_ov', 'val_ov', 'test_ov', 'train_cur']:
+    if image_set in ['val', 'eval_debug', 'train_adj', 'test', 'train_ov', 'val_ov', 'test_ov', 'train_cur', 'panda']:
 
         if os.environ.get("GFLOPS_DEBUG_SHILONG", False) == 'INFO':
             print("Under debug mode for flops calculation only!!!!!!!!!!!!!!!!")
@@ -1354,6 +1397,8 @@ def build(image_set, args):
     mode = 'instances'
     gmot_root = '../gmot-main/data/COCO/'
     gmot_root = Path(gmot_root)
+    panda_root = '../dataset/panda/'
+    panda_root = Path(panda_root)
     ov_root = 'ov_data/'
     ov_root = Path(ov_root)
     PATHS = {
@@ -1363,12 +1408,13 @@ def build(image_set, args):
         "train_adj": (root, root / "annotations" / f'fsc_adj.json'),
         "test":(gmot_root, gmot_root / 'annotations' / 'gmot_test.json'),
         "test_track":(gmot_root, gmot_root / 'annotations' / 'gmot_test.json'),
-        "test_ov":(root / 'train2017', root / "annotations" / f'{mode}_train2017.json'),
-        # "test_ov": (root / 'val2017', root / "annotations" / f'{mode}_val2017.json'),
+        # "test_ov":(root / 'train2017', root / "annotations" / f'{mode}_train2017.json'),
+        "test_ov": (root / 'val2017', root / "annotations" / f'{mode}_val2017.json'),
         "train_reg": (root / "train2017", root / "annotations" / f'{mode}_train2017.json'),
         "val": (root / 'val2017', root / "annotations" / f'{mode}_val2017.json'),
         "val_ov": (root / 'val2017', ov_root / "annotations" / f'{mode}_ov_val2017.json'),
         "eval_debug": (root / "val2017", root / "annotations" / f'{mode}_val2017.json'),
+        "panda": (panda_root, panda_root / "annotations" / f'01_University_Canteen.json'),
         # "test": (root / "test2017", root / "annotations" / 'image_info_test-dev2017.json' ),
     }
 
@@ -1405,7 +1451,7 @@ def build(image_set, args):
                 image_set=image_set,
                 aux_target_hacks=aux_target_hacks_list,
                 number_template=args.number_template,
-                # num_imgs=10,
+                num_imgs=100,
             )
     if image_set == 'test':
         dataset.get_sequence_id_to_img_id()
@@ -1415,13 +1461,14 @@ def build(image_set, args):
     elif image_set == 'train':
         dataset.get_class_id_to_img_id()
         # dataset.get_class_weight()
-        # dataset.get_ov_template()
+        dataset.get_ov_template()
         # import pdb; pdb.set_trace()
     elif image_set == 'val':
         dataset.get_class_id_to_img_id()
         # dataset.get_class_weight()
     else:
         dataset.get_class_id_to_img_id()
+        # dataset.get_class_weight()
         print(dataset.class_dict.keys())
     return dataset
 
