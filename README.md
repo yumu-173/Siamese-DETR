@@ -43,16 +43,22 @@
 
 Please download [COCO 2017](https://cocodataset.org/) dataset and organize them as following:
 ```
-COCODIR/
-  ├── train_gmot/
-  ├── val_gmot/
-  ├── test_gmot/
-  ├── fsc147/
-  └── annotations/
-  	├── train.json
-  	├── val.json
-        ├── fsc_train.json
-        └── test.json
+Dataset/
+  ├── COCO/
+    ├── annotations
+    ├── train2017
+    ├── val2017
+  ├── LaSOT/
+    ├── airplane
+      ├── img
+      └── groundtruth.txt
+    ├── ...
+  ├── GOT-10K/
+    ├── train
+      ├── GOT-10K_Train_000001
+      ├── ...
+    ├── val
+  └── instances_coco_lasot_got_train.json
 ```
 </html>
 
