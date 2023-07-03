@@ -30,6 +30,7 @@ from util.utils import ModelEma, BestMetricHolder
 
 from bbox_adjust import bbox_adjustment
 from tools.tools.coco_categories import fitler_coco_category
+from tools.tools.merge_anno_in_coco_lasot_got import build_annotations
 from torchreid.utils import FeatureExtractor
 
 def get_args_parser():
@@ -44,11 +45,13 @@ def get_args_parser():
 
     # dataset parameters
     parser.add_argument('--dataset_file', default='coco')
-    parser.add_argument('--coco_path', type=str, default='G:/tracking/GMOT40/COCO/')
     parser.add_argument('--coco_panoptic_path', type=str)
     parser.add_argument('--remove_difficult', action='store_true')
     parser.add_argument('--fix_size', action='store_true')
 
+    # COCO + LaSOT + GOT10K
+    parser.add_argument('--coco_path', type=str, default='G:/tracking/GMOT40/COCO/')
+    parser.add_argument('--coco_lasot_got_path', type=str, default='G:/tracking/GMOT40/COCO/')
 
     # training parameters
     parser.add_argument('--output_dir', default='logs/DINO/R50-MS4-1',
@@ -89,6 +92,8 @@ def get_args_parser():
     parser.add_argument('--temp_in_image', default=False, type=bool, help='find template in current image')
     parser.add_argument('--det_with_gt', default=False, type=bool, help='use gt as query box')
     parser.add_argument('--test_panda', default=False, action='store_true', help='test panda')
+    parser.add_argument('--train_with_coco_lasot_got', default=False, action='store_true', help='train with coco, lasot and got')
+
 
     # distributed training parameters
     parser.add_argument('--world_size', default=1, type=int,
@@ -217,7 +222,10 @@ def main(args):
     optimizer = torch.optim.AdamW(param_dicts, lr=args.lr,
                                   weight_decay=args.weight_decay)
     
-    if args.ov_coco:
+    if args.train_with_coco_lasot_got:
+        dataset_train = build_dataset(image_set='train_coco_lasot_got', args=args)
+        dataset_val = build_dataset(image_set='val_coco_lasot_got', args=args)
+    elif args.ov_coco:
         dataset_train = build_dataset(image_set='train_ov', args=args)
         dataset_val = build_dataset(image_set='val_ov', args=args)
     elif args.temp_in_image:
@@ -536,6 +544,9 @@ if __name__ == '__main__':
     if args.ov_coco:
         fitler_coco_category(args.coco_path, 'train')
         fitler_coco_category(args.coco_path, 'val')
+    # if args.train_with_coco_lasot_got and args.rank==0:
+    #     print('train_with_coco_lasot_got')
+    #     build_annotations(args.coco_lasot_got_path)
     if args.output_dir:
         Path(args.output_dir).mkdir(parents=True, exist_ok=True)
     main(args)

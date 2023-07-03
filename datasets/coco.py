@@ -366,13 +366,14 @@ class CocoDetection(torchvision.datasets.CocoDetection):
     def __init__(self, img_folder, ann_file, transforms, return_masks, image_set, aux_target_hacks=None,
                  num_imgs=None, number_template=None):
         super(CocoDetection, self).__init__(img_folder, ann_file)
+        # import pdb; pdb.set_trace()
         self._transforms = transforms
         self.prepare = ConvertCocoPolysToMask(return_masks, image_set)
         self.aux_target_hacks = aux_target_hacks
         self.num_imgs = num_imgs
         self.class_dict = {}
-        if image_set in ['train', 'val']:
-            self.class_weight = {}
+        # if image_set in ['train', 'val']:
+        #     self.class_weight = {}
         if image_set in ['test', 'test_ov', 'train', 'val']:
             self.template_list = {}
         # if image_set == 'train':
@@ -408,10 +409,13 @@ class CocoDetection(torchvision.datasets.CocoDetection):
                 return item
 
     def get_class_id_to_img_id(self):
+        
         for i in self.ids:
             target = self._load_target(i)
             for item in target:
                 category_id = item['category_id']
+                # if category_id > 1000:
+                #     import pdb; pdb.set_trace()
                 if category_id not in self.class_dict.keys():
                     self.class_dict[category_id] = [i]
                 else:
@@ -927,6 +931,8 @@ class CocoDetection(torchvision.datasets.CocoDetection):
                     temp_idx = random.randint(0, len(temp_ann)-1)
                     choise_num += 1
                 template_class = temp_ann[temp_idx]['category_id']
+                # if template_class > 1000:
+                #     import pdb; pdb.set_trace()
                 temp_cls_list.append(template_class)
                 # print('temp_idx:{},template_class:{}'.format(temp_idx, template_class))
                 new_img_id = random.choice(self.class_dict[template_class])
@@ -963,6 +969,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         # import pdb; pdb.set_trace()
         target = {'image_id': image_id, 'annotations': targets_list}
         # --------------------------------------------------------------------------------------------------------------
+        # import pdb; pdb.set_trace()
         img, target = self.prepare(img, target)
         # import pdb; pdb.set_trace()
         # print('target:', target)
@@ -1113,7 +1120,7 @@ class ConvertCocoPolysToMask(object):
 
         boxes = [obj["bbox"] for obj in anno]
 
-        if self.image_set in ['train', 'train_ov', 'val_ov', 'val', 'train_cur']:
+        if self.image_set in ['train', 'train_ov', 'val_ov', 'val', 'train_cur', 'train_coco_lasot_got', 'val_coco_lasot_got']:
             template = [obj["template_id"] for obj in anno]
             template = torch.tensor(template, dtype=torch.int64)
         # print('template_id', template)
@@ -1141,7 +1148,7 @@ class ConvertCocoPolysToMask(object):
         keep = (boxes[:, 3] > boxes[:, 1]) & (boxes[:, 2] > boxes[:, 0])
         boxes = boxes[keep]
         classes = classes[keep]
-        if self.image_set in ['train', 'train_ov', 'val_ov', 'val', 'train_cur']:
+        if self.image_set in ['train', 'train_ov', 'val_ov', 'val', 'train_cur', 'train_coco_lasot_got', 'val_coco_lasot_got']:
             template = template[keep]
         # import pdb; pdb.set_trace()
         if self.return_masks:
@@ -1155,7 +1162,7 @@ class ConvertCocoPolysToMask(object):
         if self.return_masks:
             target["masks"] = masks
         target["image_id"] = image_id
-        if self.image_set in ['train', 'train_ov', 'val_ov', 'val', 'train_cur']:
+        if self.image_set in ['train', 'train_ov', 'val_ov', 'val', 'train_cur', 'train_coco_lasot_got', 'val_coco_lasot_got']:
             target["template_id"] = template
         if keypoints is not None:
             target["keypoints"] = keypoints
@@ -1314,7 +1321,7 @@ def make_coco_transforms(image_set, fix_size=False, strong_aug=False, args=None)
             normalize,
         ])
 
-    if image_set in ['val', 'eval_debug', 'train_adj', 'test', 'train_ov', 'val_ov', 'test_ov', 'train_cur', 'panda']:
+    if image_set in ['val', 'eval_debug', 'train_adj', 'test', 'train_ov', 'val_ov', 'test_ov', 'train_cur', 'panda', 'train_coco_lasot_got', 'val_coco_lasot_got']:
 
         if os.environ.get("GFLOPS_DEBUG_SHILONG", False) == 'INFO':
             print("Under debug mode for flops calculation only!!!!!!!!!!!!!!!!")
@@ -1401,6 +1408,11 @@ def build(image_set, args):
     panda_root = Path(panda_root)
     ov_root = 'ov_data/'
     ov_root = Path(ov_root)
+    if args.train_with_coco_lasot_got:
+        lasot_got_coco_root = args.coco_lasot_got_path
+        lasot_got_coco_root = Path(lasot_got_coco_root)
+        val_coco_lasot_got = args.coco_lasot_got_path + '/COCO'
+        val_coco_lasot_got = Path(val_coco_lasot_got)
     PATHS = {
         "train": (root / 'train2017', root / "annotations" / f'{mode}_train2017.json'),
         "train_ov": (root / 'train2017', ov_root / "annotations" / f'{mode}_ov_train2017.json'),
@@ -1415,6 +1427,8 @@ def build(image_set, args):
         "val_ov": (root / 'val2017', ov_root / "annotations" / f'{mode}_ov_val2017.json'),
         "eval_debug": (root / "val2017", root / "annotations" / f'{mode}_val2017.json'),
         "panda": (panda_root, panda_root / "annotations" / f'01_University_Canteen.json'),
+        "train_coco_lasot_got": (lasot_got_coco_root, lasot_got_coco_root / f'{mode}_coco_lasot_got_train.json'),
+        "val_coco_lasot_got": (val_coco_lasot_got / 'val2017', val_coco_lasot_got / "annotations" / f'{mode}_val2017.json')
         # "test": (root / "test2017", root / "annotations" / 'image_info_test-dev2017.json' ),
     }
 
@@ -1423,7 +1437,9 @@ def build(image_set, args):
     img_folder, ann_file = PATHS[image_set]
     print('Dataset name:')
     print(img_folder, ann_file)
-
+    # exit(0)
+    # import pdb; pdb.set_trace()
+    
     # copy to local path
     if os.environ.get('DATA_COPY_SHILONG') == 'INFO':
         preparing_dataset(dict(img_folder=img_folder, ann_file=ann_file), image_set, args)
