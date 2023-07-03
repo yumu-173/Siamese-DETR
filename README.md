@@ -50,11 +50,13 @@ Dataset/
     ├── val2017
   ├── LaSOT/
     ├── airplane
-      ├── img
-      └── groundtruth.txt
+      ├── airplane-1
+        ├── img
+        └── groundtruth.txt
+      ├── ...
     ├── ...
   ├── GOT-10K/
-    ├── train
+    ├── train_data
       ├── GOT-10K_Train_000001
       ├── ...
     ├── val
