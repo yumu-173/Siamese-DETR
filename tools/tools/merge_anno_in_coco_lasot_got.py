@@ -26,6 +26,8 @@ def build_annotations(root):
         with open(lasot_gt) as lf:
             lasot_info = lf.readlines()
         for j, line in enumerate(lasot_info):
+            if j % 30 != 0:
+                continue
             line = line.split(',')
             image = {}
             anno = {}
@@ -37,7 +39,7 @@ def build_annotations(root):
             img = cv2.imread(path)
             image['height'] = img.shape[0]
             image['width'] = img.shape[1]
-            image['file_name'] = path[11:]
+            image['file_name'] = path[8:]
             images.append(image)
             # annotations
             anno['id'] = lasot_image_id
@@ -59,6 +61,8 @@ def build_annotations(root):
         with open(got_gt) as lf:
             got_info = lf.readlines()
         for j, line in enumerate(got_info):
+            if j % 10 != 0:
+                continue
             line = line.split(',')
             image = {}
             anno = {}
@@ -70,7 +74,7 @@ def build_annotations(root):
             img = cv2.imread(path)
             image['height'] = img.shape[0]
             image['width'] = img.shape[1]
-            image['file_name'] = path[11:]
+            image['file_name'] = path[8:]
             images.append(image)
             # annotations
             anno['id'] = got_image_id
@@ -88,7 +92,7 @@ def build_annotations(root):
     new_anno['info'] = info['info']
     new_anno['licenses'] = info['licenses']
     new_anno['categories'] = info['categories']
-    print(info.keys())
+    # print(info.keys())
 
     total_json = json.dumps(new_anno, indent=2)
     with open(root + '/instances_coco_lasot_got_train.json', 'w') as f:

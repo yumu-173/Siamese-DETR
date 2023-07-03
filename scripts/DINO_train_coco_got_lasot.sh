@@ -26,6 +26,6 @@ python -m torch.distributed.run --nproc_per_node=${GPUS} \
     --rank ${RANK} \
     --config_file config/DINO/DINO_4scale_2temp.py \
     --n_nodes ${NODE_COUNT} \
-    --batch_size=2 \
+    --batch_size=1 \
     --output_dir $out_put_dir \
     --train_with_coco_lasot_got
