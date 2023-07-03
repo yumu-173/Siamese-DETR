@@ -1467,7 +1467,7 @@ def build(image_set, args):
                 image_set=image_set,
                 aux_target_hacks=aux_target_hacks_list,
                 number_template=args.number_template,
-                num_imgs=100,
+                # num_imgs=100,
             )
     if image_set == 'test':
         dataset.get_sequence_id_to_img_id()

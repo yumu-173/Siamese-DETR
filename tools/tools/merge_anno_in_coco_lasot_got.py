@@ -52,7 +52,7 @@ def build_annotations(root):
     # GOT 
     # got_category_id = 50xx
     got_image_id = 20000000
-    got_gt_list = glob.glob(root + '/GOT-10K/train/*/groundtruth.txt')
+    got_gt_list = glob.glob(root + '/GOT-10K/train_data/*/groundtruth.txt')
     # print(got_gt_list)
     for i, got_gt in enumerate(got_gt_list):
         category_id = 5000 + i
@@ -100,6 +100,6 @@ def build_annotations(root):
 
 
 if __name__ == '__main__':
-    root = '../dataset'
+    root = 'Dataset'
     print('*****Merge annotations from 3 dataset*****')
     build_annotations(root)
