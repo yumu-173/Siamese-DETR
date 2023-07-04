@@ -14,7 +14,7 @@ echo "master port: ${MASTER_PORT}"
 coco_lasot_got_path=$1
 out_put_dir=$2
 
-python tools/tools/merge_anno_in_coco_lasot_got.py
+# python tools/tools/merge_anno_in_coco_lasot_got.py
 
 python -m torch.distributed.run --nproc_per_node=${GPUS} \
     --nnodes ${NODE_COUNT} \

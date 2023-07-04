@@ -2,8 +2,7 @@ import glob
 import json
 import cv2
 import time
-
-
+import argparse
 
 def build_annotations(root):
     start = time.time()
@@ -104,6 +103,9 @@ def build_annotations(root):
 
 
 if __name__ == '__main__':
-    root = 'Dataset'
+    parser = argparse.ArgumentParser(description='Merge annotations from 3 dataset')
+    parser.add_argument('output_dir', default='Dataset', type=str)
+    args = parser.parse_args()
+    root = args.output_dir
     print('*****Merge annotations from 3 dataset*****')
     build_annotations(root)
