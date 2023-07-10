@@ -1120,7 +1120,8 @@ class ConvertCocoPolysToMask(object):
 
         boxes = [obj["bbox"] for obj in anno]
 
-        if self.image_set in ['train', 'train_ov', 'val_ov', 'val', 'train_cur', 'train_coco_lasot_got', 'val_coco_lasot_got']:
+        if self.image_set in ['train', 'train_ov', 'val_ov', 'val', 'train_cur', 'train_coco_lasot_got', 
+                              'val_coco_lasot_got', 'train_o365', 'val_o365']:
             template = [obj["template_id"] for obj in anno]
             template = torch.tensor(template, dtype=torch.int64)
         # print('template_id', template)
@@ -1148,7 +1149,8 @@ class ConvertCocoPolysToMask(object):
         keep = (boxes[:, 3] > boxes[:, 1]) & (boxes[:, 2] > boxes[:, 0])
         boxes = boxes[keep]
         classes = classes[keep]
-        if self.image_set in ['train', 'train_ov', 'val_ov', 'val', 'train_cur', 'train_coco_lasot_got', 'val_coco_lasot_got']:
+        if self.image_set in ['train', 'train_ov', 'val_ov', 'val', 'train_cur', 'train_coco_lasot_got', 
+                              'val_coco_lasot_got', 'train_o365', 'val_o365']:
             template = template[keep]
         # import pdb; pdb.set_trace()
         if self.return_masks:
@@ -1162,7 +1164,8 @@ class ConvertCocoPolysToMask(object):
         if self.return_masks:
             target["masks"] = masks
         target["image_id"] = image_id
-        if self.image_set in ['train', 'train_ov', 'val_ov', 'val', 'train_cur', 'train_coco_lasot_got', 'val_coco_lasot_got']:
+        if self.image_set in ['train', 'train_ov', 'val_ov', 'val', 'train_cur', 
+                              'train_coco_lasot_got', 'val_coco_lasot_got', 'train_o365', 'val_o365']:
             target["template_id"] = template
         if keypoints is not None:
             target["keypoints"] = keypoints
@@ -1321,7 +1324,8 @@ def make_coco_transforms(image_set, fix_size=False, strong_aug=False, args=None)
             normalize,
         ])
 
-    if image_set in ['val', 'eval_debug', 'train_adj', 'test', 'train_ov', 'val_ov', 'test_ov', 'train_cur', 'panda', 'train_coco_lasot_got', 'val_coco_lasot_got']:
+    if image_set in ['val', 'eval_debug', 'train_adj', 'test', 'train_ov', 'val_ov', 'test_ov', 'train_cur', 
+                     'panda', 'train_coco_lasot_got', 'val_coco_lasot_got', 'train_o365', 'val_o365']:
 
         if os.environ.get("GFLOPS_DEBUG_SHILONG", False) == 'INFO':
             print("Under debug mode for flops calculation only!!!!!!!!!!!!!!!!")
@@ -1413,6 +1417,9 @@ def build(image_set, args):
         lasot_got_coco_root = Path(lasot_got_coco_root)
         val_coco_lasot_got = args.coco_lasot_got_path + '/COCO'
         val_coco_lasot_got = Path(val_coco_lasot_got)
+    else:
+        lasot_got_coco_root = Path(root)
+        val_coco_lasot_got = Path(root)
     PATHS = {
         "train": (root / 'train2017', root / "annotations" / f'{mode}_train2017.json'),
         "train_ov": (root / 'train2017', ov_root / "annotations" / f'{mode}_ov_train2017.json'),
@@ -1428,7 +1435,9 @@ def build(image_set, args):
         "eval_debug": (root / "val2017", root / "annotations" / f'{mode}_val2017.json'),
         "panda": (panda_root, panda_root / "annotations" / f'01_University_Canteen.json'),
         "train_coco_lasot_got": (lasot_got_coco_root, lasot_got_coco_root / f'{mode}_coco_lasot_got_train.json'),
-        "val_coco_lasot_got": (val_coco_lasot_got / 'val2017', val_coco_lasot_got / "annotations" / f'{mode}_val2017.json')
+        "val_coco_lasot_got": (val_coco_lasot_got / 'val2017', val_coco_lasot_got / "annotations" / f'{mode}_val2017.json'),
+        "train_o365": (root / 'train', root / f'cov_o365_train.json'),
+        "val_o365": (root / 'val', root / f'cov_o365_val.json'),
         # "test": (root / "test2017", root / "annotations" / 'image_info_test-dev2017.json' ),
     }
 

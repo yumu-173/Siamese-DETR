@@ -720,7 +720,7 @@ def track_test(model, criterion, postprocessors, dataset, base_ds, device, outpu
     # coco_evaluator = CocoEvaluator(base_ds, iou_types)
     # coco_evaluator.coco_eval[iou_types[0]].params.iouThrs = [0, 0.1, 0.5, 0.75]
 
-    save_path = 'results_ft/'
+    save_path = 'results_yolo/'
 
     for seq, template in dataset:
         txt_name = save_path + str(seq) + '.txt'
@@ -728,10 +728,10 @@ def track_test(model, criterion, postprocessors, dataset, base_ds, device, outpu
             f.close()
         tracker.reset()
         # import pdb;pdb.set_trace()
-        if str(seq) in score_dict_ft.keys():
+        if str(seq) in score_dict.keys():
             # tracker.detection_person_thresh = score_dict_no[str(seq)]
             # tracker.detection_person_thresh = score_dict_no[str(seq)]
-            tracker.detection_person_thresh = score_dict_ft[str(seq)]
+            tracker.detection_person_thresh = score_dict[str(seq)]
             # tracker.detection_person_thresh = score_dict_4t[str(seq)]
             # tracker.detection_person_thresh = score_dict_1t[str(seq)]
             # tracker.detection_person_thresh = 0.25

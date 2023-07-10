@@ -52,6 +52,7 @@ def get_args_parser():
     # COCO + LaSOT + GOT10K
     parser.add_argument('--coco_path', type=str, default='G:/tracking/GMOT40/COCO/')
     parser.add_argument('--coco_lasot_got_path', type=str, default='G:/tracking/GMOT40/COCO/')
+    # parser.add_argument('--o365_path', type=str, default='G:/tracking/GMOT40/COCO/')
 
     # training parameters
     parser.add_argument('--output_dir', default='logs/DINO/R50-MS4-1',
@@ -93,6 +94,7 @@ def get_args_parser():
     parser.add_argument('--det_with_gt', default=False, type=bool, help='use gt as query box')
     parser.add_argument('--test_panda', default=False, action='store_true', help='test panda')
     parser.add_argument('--train_with_coco_lasot_got', default=False, action='store_true', help='train with coco, lasot and got')
+    parser.add_argument('--train_with_o365', default=False, action='store_true', help='train with object365')
 
 
     # distributed training parameters
@@ -225,6 +227,9 @@ def main(args):
     if args.train_with_coco_lasot_got:
         dataset_train = build_dataset(image_set='train_coco_lasot_got', args=args)
         dataset_val = build_dataset(image_set='val_coco_lasot_got', args=args)
+    elif args.train_with_o365:
+        dataset_train = build_dataset(image_set='train_o365', args=args)
+        dataset_val = build_dataset(image_set='val_o365', args=args)
     elif args.ov_coco:
         dataset_train = build_dataset(image_set='train_ov', args=args)
         dataset_val = build_dataset(image_set='val_ov', args=args)
