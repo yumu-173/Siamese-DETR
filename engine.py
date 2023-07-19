@@ -527,46 +527,46 @@ score_dict_no = {
 }
 
 score_dict_4t = {
-    'airplane-3': 0.35,
-    'airplane-0': 0.25, # 23
+    'airplane-3': 0.35, # 79.8%
+    'airplane-0': 0.28, # 23 -15.3
     'airplane-1': 0.35, # 35
-    'airplane-2': 0.28,
-    'bird-1': 0.25,
+    'airplane-2': 0.3, # 66.0%
+    # 'bird-1': 0.25,
     'bird-0': 0.2,
     'bird-2': 0.3,
-    # 'bird-3': 0.3,
+    'bird-3': 0.3, # 36.4%
     'person-3': 0.3,
     'person-1': 0.3, # 25
     'person-2': 0.42,
     'person-0': 0.23,
-    'stock-3': 0.35,
+    'stock-3': 0.4, # 3.6%
     # 'stock-2': 0.23,
-    # 'stock-1': 0.33,
+    'stock-1': 0.3,
     'stock-0': 0.22,
-    # 'car-0': 0.15,
+    'car-0': 0.2,
     'car-1': 0.35, # 23
     'car-2': 0.3, # 18
-    # 'car-3': 0.25,
+    'car-3': 0.2, # 74%
     'insect-3': 0.3,
     'insect-2': 0.3,
-    'insect-1': 0.4,
-    # 'insect-0': 0.2,
+    'insect-1': 0.5,  #-37.1
+    'insect-0': 0.15,  # 2%
     'balloon-3': 0.1, # 15
     'balloon-2': 0.2,
     'balloon-1': 0.15, # 2
-    # 'balloon-0': 0.25,
+    'balloon-0': 0.2,
     'fish-3': 0.2,
-    'fish-2': 0.25,
-    'fish-1': 0.27,
-    # 'fish-0': 0.23,
+    'fish-2': 0.2,
+    'fish-1': 0.25, # 70.1%
+    'fish-0': 0.15, # 14.4%
     'boat-3': 0.3,
     'boat-2': 0.27,
     'boat-1': 0.33,
-    'boat-0': 0.25, # 2
-    # 'ball-3': 0.18,
-    'ball-0': 0.23,
-    # 'ball-2': 0.15,
-    # 'ball-1': 0.25,
+    'boat-0': 0.2, # 2
+    # 'ball-3': 0.2,
+    'ball-0': 0.3,
+    # 'ball-2': 0.2,
+    'ball-1': 0.18,
     # 'ball-0': 0.009,
     'else': 0.25
 }
@@ -720,7 +720,7 @@ def track_test(model, criterion, postprocessors, dataset, base_ds, device, outpu
     # coco_evaluator = CocoEvaluator(base_ds, iou_types)
     # coco_evaluator.coco_eval[iou_types[0]].params.iouThrs = [0, 0.1, 0.5, 0.75]
 
-    save_path = 'results_yolo/'
+    save_path = 'results_all/results/'
 
     for seq, template in dataset:
         txt_name = save_path + str(seq) + '.txt'
@@ -728,11 +728,11 @@ def track_test(model, criterion, postprocessors, dataset, base_ds, device, outpu
             f.close()
         tracker.reset()
         # import pdb;pdb.set_trace()
-        if str(seq) in score_dict.keys():
+        if str(seq) in score_dict_4t.keys():
             # tracker.detection_person_thresh = score_dict_no[str(seq)]
             # tracker.detection_person_thresh = score_dict_no[str(seq)]
-            tracker.detection_person_thresh = score_dict[str(seq)]
-            # tracker.detection_person_thresh = score_dict_4t[str(seq)]
+            # tracker.detection_person_thresh = score_dict[str(seq)]
+            tracker.detection_person_thresh = score_dict_4t[str(seq)]
             # tracker.detection_person_thresh = score_dict_1t[str(seq)]
             # tracker.detection_person_thresh = 0.25
             # print(seq, tracker.detection_person_thresh)
@@ -1207,4 +1207,6 @@ def test_panda(model, criterion, postprocessors, data_loader, base_ds, device, o
         import json
         with open(args.output_dir + f'/results{args.rank}.json', 'w') as f:
             json.dump(final_res, f)  
+    
+    
     return final_res

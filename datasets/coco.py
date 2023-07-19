@@ -827,7 +827,15 @@ class CocoDetection(torchvision.datasets.CocoDetection):
             img, target = super(CocoDetection, self).__getitem__(idx)
         image_id = self.ids[idx]
         # print('template image id:', image_id)
+
+        remove_crowd_target = []
+        for item in target:
+            if item['iscrowd'] == 0:
+                remove_crowd_target.append(item)
+        target = remove_crowd_target
+        # import pdb; pdb.set_trace()
         target = {'image_id': image_id, 'annotations': target}
+        
         # import pdb; pdb.set_trace()
         # --------------------------------------------------------------------------------------------------------------
         # print(img)
@@ -948,15 +956,21 @@ class CocoDetection(torchvision.datasets.CocoDetection):
                 box[2] = box[0] + max(1, box[2])
                 box[3] = box[1] + max(box[3], 1)
                 template = new_img.crop(box)
-                # template_show = False
+                # template_show = True
                 # if template_show:
-                #     template_path = 'template/coco/template_' + str(_) + '.jpg'
+                #     template_path = 'template/o365/template_' + str(image_id) + '.jpg'
                 #     template.save(template_path)
+                #     path = 'Dataset/object365/train/' + self.coco.loadImgs(image_id)[0]["file_name"]
+                #     # print(path)
+                #     # exit(0)
+                #     img_vis = cv2.imread(path)
+                #     img_path = 'template/o365/img_' + str(image_id) + '.jpg'
                 template_list.append(template)
-                # import pdb; pdb.set_trace()
                 # change target
                 target_2class = deepcopy(target['annotations'])
                 for item in target_2class:
+                    if item['iscrowd'] == 1:
+                        continue
                     if item['category_id'] == template_class:
                         item['category_id'] = 1
                         item['template_id'] = _
@@ -964,6 +978,13 @@ class CocoDetection(torchvision.datasets.CocoDetection):
                         item['category_id'] = 0
                         item['template_id'] = _
                     targets_list.append(item)
+                #     box = item['bbox']
+                #     print(box)
+                #     cv2.rectangle(img_vis, (int(box[0]), int(box[1])), (int(box[0]+box[2]), int(box[1]+box[3])), (0,255,0), 2)
+                #     cv2.putText(img_vis, str(item['category_id']), (int(box[0]), int(box[1])), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 255, 0), 2)
+                # cv2.imwrite(img_path, img_vis)
+
+                # import pdb; pdb.set_trace()
 
             # print('targets_list:', len(targets_list))
         # import pdb; pdb.set_trace()
@@ -1121,7 +1142,8 @@ class ConvertCocoPolysToMask(object):
         boxes = [obj["bbox"] for obj in anno]
 
         if self.image_set in ['train', 'train_ov', 'val_ov', 'val', 'train_cur', 'train_coco_lasot_got', 
-                              'val_coco_lasot_got', 'train_o365', 'val_o365']:
+                              'val_coco_lasot_got', 'train_o365', 'val_o365', 'train_gmot',
+                              'train_od', 'val_od']:
             template = [obj["template_id"] for obj in anno]
             template = torch.tensor(template, dtype=torch.int64)
         # print('template_id', template)
@@ -1150,7 +1172,8 @@ class ConvertCocoPolysToMask(object):
         boxes = boxes[keep]
         classes = classes[keep]
         if self.image_set in ['train', 'train_ov', 'val_ov', 'val', 'train_cur', 'train_coco_lasot_got', 
-                              'val_coco_lasot_got', 'train_o365', 'val_o365']:
+                              'val_coco_lasot_got', 'train_o365', 'val_o365', 'train_gmot',
+                              'train_od', 'val_od']:
             template = template[keep]
         # import pdb; pdb.set_trace()
         if self.return_masks:
@@ -1164,8 +1187,9 @@ class ConvertCocoPolysToMask(object):
         if self.return_masks:
             target["masks"] = masks
         target["image_id"] = image_id
-        if self.image_set in ['train', 'train_ov', 'val_ov', 'val', 'train_cur', 
-                              'train_coco_lasot_got', 'val_coco_lasot_got', 'train_o365', 'val_o365']:
+        if self.image_set in ['train', 'train_ov', 'val_ov', 'val', 'train_cur', 'train_gmot',
+                              'train_coco_lasot_got', 'val_coco_lasot_got', 'train_o365', 'val_o365',
+                              'train_od', 'val_od']:
             target["template_id"] = template
         if keypoints is not None:
             target["keypoints"] = keypoints
@@ -1325,7 +1349,8 @@ def make_coco_transforms(image_set, fix_size=False, strong_aug=False, args=None)
         ])
 
     if image_set in ['val', 'eval_debug', 'train_adj', 'test', 'train_ov', 'val_ov', 'test_ov', 'train_cur', 
-                     'panda', 'train_coco_lasot_got', 'val_coco_lasot_got', 'train_o365', 'val_o365']:
+                     'panda', 'train_coco_lasot_got', 'val_coco_lasot_got', 'train_o365', 'val_o365', 'train_gmot',
+                     'train_od', 'val_od']:
 
         if os.environ.get("GFLOPS_DEBUG_SHILONG", False) == 'INFO':
             print("Under debug mode for flops calculation only!!!!!!!!!!!!!!!!")
@@ -1425,6 +1450,7 @@ def build(image_set, args):
         "train_ov": (root / 'train2017', ov_root / "annotations" / f'{mode}_ov_train2017.json'),
         "train_cur": (root / 'train2017', root / "annotations" / f'{mode}_train2017.json'),
         "train_adj": (root, root / "annotations" / f'fsc_adj.json'),
+        "train_gmot":(gmot_root, gmot_root / 'annotations' / 'gmot_test.json'),
         "test":(gmot_root, gmot_root / 'annotations' / 'gmot_test.json'),
         "test_track":(gmot_root, gmot_root / 'annotations' / 'gmot_test.json'),
         # "test_ov":(root / 'train2017', root / "annotations" / f'{mode}_train2017.json'),
@@ -1436,8 +1462,10 @@ def build(image_set, args):
         "panda": (panda_root, panda_root / "annotations" / f'01_University_Canteen.json'),
         "train_coco_lasot_got": (lasot_got_coco_root, lasot_got_coco_root / f'{mode}_coco_lasot_got_train.json'),
         "val_coco_lasot_got": (val_coco_lasot_got / 'val2017', val_coco_lasot_got / "annotations" / f'{mode}_val2017.json'),
-        "train_o365": (root / 'train', root / f'cov_o365_train.json'),
-        "val_o365": (root / 'val', root / f'cov_o365_val.json'),
+        "train_o365": (root / 'train', root / f'objects365_train.json'),
+        "val_o365": (root / 'val', root / f'objects365_val.json'),
+        "train_od": (root / 'train', root / f'od_train.json'),
+        "val_od": (root / 'val', root / f'od_val.json'),
         # "test": (root / "test2017", root / "annotations" / 'image_info_test-dev2017.json' ),
     }
 

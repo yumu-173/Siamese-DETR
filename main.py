@@ -94,7 +94,9 @@ def get_args_parser():
     parser.add_argument('--det_with_gt', default=False, type=bool, help='use gt as query box')
     parser.add_argument('--test_panda', default=False, action='store_true', help='test panda')
     parser.add_argument('--train_with_coco_lasot_got', default=False, action='store_true', help='train with coco, lasot and got')
-    parser.add_argument('--train_with_o365', default=False, action='store_true', help='train with object365')
+    parser.add_argument('--train_with_o365', default=False, action='store_true', help='train with objects365.json')
+    parser.add_argument('--train_with_od', default=False, action='store_true', help='train with od.json')
+    parser.add_argument('--train_with_gmot', default=False, action='store_true', help='train with gmot')
 
 
     # distributed training parameters
@@ -227,6 +229,13 @@ def main(args):
     if args.train_with_coco_lasot_got:
         dataset_train = build_dataset(image_set='train_coco_lasot_got', args=args)
         dataset_val = build_dataset(image_set='val_coco_lasot_got', args=args)
+    elif args.train_with_od:
+        dataset_train = build_dataset(image_set='train_od', args=args)
+        dataset_val = build_dataset(image_set='val_od', args=args)
+    elif args.train_with_gmot:
+        print('args.train_with_gmot',args.train_with_gmot)
+        dataset_train = build_dataset(image_set='train_gmot', args=args)
+        dataset_val = build_dataset(image_set='train_gmot', args=args)
     elif args.train_with_o365:
         dataset_train = build_dataset(image_set='train_o365', args=args)
         dataset_val = build_dataset(image_set='val_o365', args=args)
