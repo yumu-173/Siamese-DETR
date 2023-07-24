@@ -13,6 +13,8 @@ import torchvision
 import random
 import numpy as np
 from copy import deepcopy
+import json
+import cv2
 
 from util.misc import (NestedTensor, nested_tensor_from_tensor_list,
                        accuracy, get_world_size, interpolate,
@@ -104,12 +106,55 @@ def prepare_for_sample_dn(dn_args, training, num_queries, hidden_dim, query_labe
             diff[:, 2:] = known_bboxs[:, 2:] / 2
 
             rand_sign = torch.randint_like(known_bboxs, low=0, high=2, dtype=torch.float32) * 2.0 - 1.0
-            rand_part = torch.rand_like(known_bboxs)
+            
+            size = (known_bboxs.shape[0], 1)
+            rand_part_x = torch.normal(torch.tensor(0.002669), torch.tensor(0.000006), size)
+            rand_part_y = torch.normal(torch.tensor(0.003294), torch.tensor(0.000007), size)
+            rand_part_w = torch.normal(torch.tensor(0.002264), torch.tensor(0.000005), size)
+            rand_part_h = torch.normal(torch.tensor(0.002833), torch.tensor(0.000006), size)
+            rand_part = torch.cat([rand_part_x, rand_part_y, rand_part_w, rand_part_h], dim=1).cuda()
+            # import pdb; pdb.set_trace()
+
+            # rand_part = torch.rand_like(known_bboxs)
             rand_part[negative_idx] += 1.0
             rand_part *= rand_sign
-            known_bbox_ = known_bbox_ + torch.mul(rand_part,
-                                                  diff).cuda() * box_noise_scale
+            
+            known_bbox_ = known_bbox_ + torch.mul(rand_part, diff).cuda() * box_noise_scale
             known_bbox_ = known_bbox_.clamp(min=0.0, max=1.0)
+            # import pdb; pdb.set_trace()
+            # image_id = t['image_id'].cpu().item()
+            # if image_id % 500 == 0:
+            #     with open('../gmot-main/data/COCO/annotations/gmot_test.json') as f:
+            #         gt = json.load(f)
+            #     images = gt['images']
+            #     t = targets[0]
+            #     for image in images:
+            #         if image['id'] == t['image_id']:
+            #             img_path = '../gmot-main/data/COCO/' + image['file_name']
+            #             img = cv2.imread(img_path)
+            #     index = 1
+            #     for box, dn_box in zip(known_bboxs, known_bbox_):
+            #         box = box.cpu().tolist()
+            #         dn_box = dn_box.cpu().tolist()
+            #         h, w, _ = img.shape
+            #         box[0] = int((box[0] - box[2]/2)*w)
+            #         box[1] = int((box[1] - box[3]/2)*h)
+            #         box[2] = int(box[2]*w) + box[0]
+            #         box[3] = int(box[3]*h) + box[1]
+            #         dn_box[0] = int(dn_box[0]*w)
+            #         dn_box[1] = int(dn_box[1]*h)
+            #         dn_box[2] = int(dn_box[2]*w)
+            #         dn_box[3] = int(dn_box[3]*h)
+            #         # import pdb; pdb.set_trace()
+            #         gt_object = img[box[1]:box[3], box[0]:box[2]]
+            #         dn_object = img[dn_box[1]:dn_box[3], dn_box[0]:dn_box[2]]                
+            #         img1 = cv2.resize(gt_object, (640, 480))
+            #         img2 = cv2.resize(dn_object, (640, 480))
+            #         object = np.vstack((img1, img2))
+            #         name = 'track_vis/dn_vis/' + str(image_id) + '_' + str(index) + '.jpg'
+            #         index += 1
+            #         cv2.imwrite(name, object)
+                    # import pdb; pdb.set_trace()
             known_bbox_expand[:, :2] = (known_bbox_[:, :2] + known_bbox_[:, 2:]) / 2
             known_bbox_expand[:, 2:] = known_bbox_[:, 2:] - known_bbox_[:, :2]
         
@@ -167,6 +212,7 @@ def prepare_for_sample_dn(dn_args, training, num_queries, hidden_dim, query_labe
 
     
     # print(len(targets))
+    # import pdb; pdb.set_trace()
     return input_query_label, input_query_bbox, attn_mask, dn_meta
 
 

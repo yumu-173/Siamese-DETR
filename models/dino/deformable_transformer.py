@@ -520,6 +520,7 @@ class DeformableTransformer(nn.Module):
                 tgt, refpoint_embed, attn_mask, dn_meta =\
                         prepare_for_sample_dn(dn_args=(targets, self.dn_number, self.dn_label_noise_ratio, self.dn_box_noise_scale),
                                                 training=self.training, num_queries=self.num_queries, hidden_dim=self.d_model, query_label=tgt_)
+                # import pdb; pdb.set_trace()
             elif self.dn_type == 'origin':
                 tgt, refpoint_embed, attn_mask, dn_meta =\
                     prepare_for_cdn(dn_args=(targets, self.dn_number, self.dn_label_noise_ratio, self.dn_box_noise_scale),
