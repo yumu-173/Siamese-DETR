@@ -24,4 +24,5 @@ python -m torch.distributed.run --nproc_per_node=${GPUS} \
     --config_file config/DINO/DINO_4scale_2temp.py \
     --n_nodes ${NODE_COUNT} \
     --batch_size=2 \
-    --output_dir $out_put_dir
+    --output_dir $out_put_dir \
+    --dn_for_track

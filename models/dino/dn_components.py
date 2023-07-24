@@ -39,7 +39,7 @@ def random_crop():
 
 def prepare_for_sample_dn(dn_args, training, num_queries, hidden_dim, query_label):
     if training:
-        targets, dn_number, label_noise_ratio, box_noise_scale = dn_args
+        targets, dn_number, label_noise_ratio, box_noise_scale, dn_for_track = dn_args
         # positive and negative dn queries
         dn_number = dn_number * 2
         # limit dn_number < query_num/2
@@ -107,19 +107,24 @@ def prepare_for_sample_dn(dn_args, training, num_queries, hidden_dim, query_labe
 
             rand_sign = torch.randint_like(known_bboxs, low=0, high=2, dtype=torch.float32) * 2.0 - 1.0
             
-            size = (known_bboxs.shape[0], 1)
-            rand_part_x = torch.normal(torch.tensor(0.002669), torch.tensor(0.000006), size)
-            rand_part_y = torch.normal(torch.tensor(0.003294), torch.tensor(0.000007), size)
-            rand_part_w = torch.normal(torch.tensor(0.002264), torch.tensor(0.000005), size)
-            rand_part_h = torch.normal(torch.tensor(0.002833), torch.tensor(0.000006), size)
-            rand_part = torch.cat([rand_part_x, rand_part_y, rand_part_w, rand_part_h], dim=1).cuda()
-            # import pdb; pdb.set_trace()
-
-            # rand_part = torch.rand_like(known_bboxs)
-            rand_part[negative_idx] += 1.0
-            rand_part *= rand_sign
-            
-            known_bbox_ = known_bbox_ + torch.mul(rand_part, diff).cuda() * box_noise_scale
+            if dn_for_track:
+                size = (known_bboxs.shape[0], 1)
+                rand_part_x = torch.normal(torch.tensor(0.002669), torch.tensor(0.000006), size)
+                rand_part_y = torch.normal(torch.tensor(0.003294), torch.tensor(0.000007), size)
+                rand_part_w = torch.normal(torch.tensor(0.002264), torch.tensor(0.000005), size)
+                rand_part_h = torch.normal(torch.tensor(0.002833), torch.tensor(0.000006), size)
+                rand_part = torch.cat([rand_part_x, rand_part_y, rand_part_w, rand_part_h], dim=1).cuda()
+                box_noise_scale = 1
+                # import pdb; pdb.set_trace()
+                rand_part[negative_idx] += 1.0
+                rand_part *= rand_sign
+                known_bbox_ = known_bbox_ + rand_part.cuda() * box_noise_scale
+            else:
+                rand_part = torch.rand_like(known_bboxs)
+                rand_part[negative_idx] += 1.0
+                rand_part *= rand_sign
+                
+                known_bbox_ = known_bbox_ + torch.mul(rand_part, diff).cuda() * box_noise_scale
             known_bbox_ = known_bbox_.clamp(min=0.0, max=1.0)
             # import pdb; pdb.set_trace()
             # image_id = t['image_id'].cpu().item()

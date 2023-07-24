@@ -120,6 +120,7 @@ class DeformableTransformer(nn.Module):
                  dn_label_noise_ratio = 0.5,
                  dn_labelbook_size = 100,
                  num_classes = 2,
+                 dn_for_track = False,
                  #for ov test
                  test_ov=False
                  ):
@@ -147,6 +148,7 @@ class DeformableTransformer(nn.Module):
         self.dn_label_noise_ratio = dn_label_noise_ratio
         self.dn_labelbook_size = dn_labelbook_size
         self.num_classes = num_classes
+        self.dn_for_track = dn_for_track
         if self.dn_type == 'origin':
             self.label_enc = nn.Embedding(dn_labelbook_size + 1, d_model)
 
@@ -518,7 +520,7 @@ class DeformableTransformer(nn.Module):
                 #prepare for dsn
                 # import pdb; pdb.set_trace()
                 tgt, refpoint_embed, attn_mask, dn_meta =\
-                        prepare_for_sample_dn(dn_args=(targets, self.dn_number, self.dn_label_noise_ratio, self.dn_box_noise_scale),
+                        prepare_for_sample_dn(dn_args=(targets, self.dn_number, self.dn_label_noise_ratio, self.dn_box_noise_scale, self.dn_for_track),
                                                 training=self.training, num_queries=self.num_queries, hidden_dim=self.d_model, query_label=tgt_)
                 # import pdb; pdb.set_trace()
             elif self.dn_type == 'origin':
@@ -1333,6 +1335,7 @@ def build_deformable_transformer(args):
         dn_label_noise_ratio = args.dn_label_noise_ratio,
         dn_labelbook_size = args.dn_labelbook_size,
         num_classes = args.num_classes,
+        dn_for_track = args.dn_for_track,
 
         # ov test
         test_ov = args.test_ov,
