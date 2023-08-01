@@ -508,8 +508,9 @@ def init_distributed_mode(args):
     print("world_size:{} rank:{} local_rank:{}".format(args.world_size, args.rank, args.local_rank))
     args.distributed = True
     torch.cuda.set_device(args.local_rank)
-    # args.dist_backend = 'nccl'
-    args.dist_backend = 'gloo'
+    args.dist_backend = 'nccl'
+    # args.dist_backend = 'gloo'
+    # args.dist_backend = 'MPI'
     print('| distributed init (rank {}): {}'.format(args.rank, args.dist_url), flush=True)
     torch.distributed.init_process_group(backend=args.dist_backend, init_method=args.dist_url,
                                          world_size=args.world_size, rank=args.rank)

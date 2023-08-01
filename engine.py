@@ -109,6 +109,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         else:
             # original backward function
             optimizer.zero_grad()
+            # import pdb; pdb.set_trace()
             losses.backward()
             if max_norm > 0:
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
@@ -227,12 +228,13 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, out
         orig_target_sizes = torch.stack([t["orig_size"] for t in targets], dim=0)
         # import pdb; pdb.set_trace()
         results = postprocessors['bbox'](outputs, orig_target_sizes)
+        # import pdb; pdb.set_trace()
         # [scores: [100], labels: [100], boxes: [100, 4]] x B
         if 'segm' in postprocessors.keys():
             target_sizes = torch.stack([t["size"] for t in targets], dim=0)
             results = postprocessors['segm'](results, outputs, orig_target_sizes, target_sizes)
         res = {target['image_id'].item(): output for target, output in zip(targets, results)}
-        # import ipdb; ipdb.set_trace()
+        # import pdb; pdb.set_trace()
         if coco_evaluator is not None:
             coco_evaluator.update(res)
 
@@ -482,12 +484,12 @@ score_dict = {
 }
 
 score_dict_no = {
-    'airplane-3': 0.28,
-    'airplane-0': 0.18, # 23
+    'airplane-3': 0.25,
+    'airplane-0': 0.2, # 23
     'airplane-1': 0.25, # 35
-    'airplane-2': 0.25,
-    'bird-1': 0.25,
-    # 'bird-0': 0.2,
+    'airplane-2': 0.23,
+    'bird-1': 0.3,
+    # 'bird-0': 0.3,
     'bird-2': 0.17,
     'bird-3': 0.2,
     'person-3': 0.25,
@@ -498,8 +500,8 @@ score_dict_no = {
     # 'stock-2': 0.23,
     'stock-1': 0.25,
     'stock-0': 0.22,
-    # 'car-0': 0.15,
-    'car-1': 0.3, # 23
+    'car-0': 0.35,
+    'car-1': 0.38, # 23
     'car-2': 0.2, # 18
     # 'car-3': 0.25,
     'insect-3': 0.3,
@@ -508,21 +510,21 @@ score_dict_no = {
     # 'insect-0': 0.2,
     'balloon-3': 0.13, # 15
     'balloon-2': 0.2,
-    'balloon-1': 0.12, # 2
-    # 'balloon-0': 0.25,
+    'balloon-1': 0.2, # 2
+    'balloon-0': 0.3,
     'fish-3': 0.21,
     'fish-2': 0.2,
     # 'fish-1': 0.23,
-    'fish-0': 0.18,
+    'fish-0': 0.15,
     'boat-3': 0.25,
     'boat-2': 0.22,
     'boat-1': 0.22,
     'boat-0': 0.17, # 2
-    'ball-3': 0.2,
+    'ball-3': 0.25,
     # 'ball-0': 0.25,
-    # 'ball-2': 0.15,
-    # 'ball-1': 0.25,
-    'ball-0': 0.23,
+    'ball-2': 0.3,
+    'ball-1': 0.3,
+    'ball-0': 0.25,
     'else': 0.25
 }
 
@@ -728,11 +730,11 @@ def track_test(model, criterion, postprocessors, dataset, base_ds, device, outpu
             f.close()
         tracker.reset()
         # import pdb;pdb.set_trace()
-        if str(seq) in score_dict_4t.keys():
+        if str(seq) in score_dict_no.keys():
             # tracker.detection_person_thresh = score_dict_no[str(seq)]
-            # tracker.detection_person_thresh = score_dict_no[str(seq)]
+            tracker.detection_person_thresh = score_dict_no[str(seq)]
             # tracker.detection_person_thresh = score_dict[str(seq)]
-            tracker.detection_person_thresh = score_dict_4t[str(seq)]
+            # tracker.detection_person_thresh = score_dict_4t[str(seq)]
             # tracker.detection_person_thresh = score_dict_1t[str(seq)]
             # tracker.detection_person_thresh = 0.25
             # print(seq, tracker.detection_person_thresh)

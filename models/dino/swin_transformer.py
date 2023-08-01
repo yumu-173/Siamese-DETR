@@ -185,10 +185,10 @@ class SwinTransformerBlock(nn.Module):
         mlp_hidden_dim = int(dim * mlp_ratio)
         self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=act_layer, drop=drop)
 
-        self.H = None
-        self.W = None
+        # self.H = None
+        # self.W = None
 
-    def forward(self, x, mask_matrix):
+    def forward(self, x, mask_matrix, Hh, Ww):
         """ Forward function.
         Args:
             x: Input feature, tensor size (B, H*W, C).
@@ -196,7 +196,9 @@ class SwinTransformerBlock(nn.Module):
             mask_matrix: Attention mask for cyclic shift.
         """
         B, L, C = x.shape
-        H, W = self.H, self.W
+        # H, W = self.H, self.W
+        H, W = Hh, Ww
+        # print(B, C, L, H, W)
         assert L == H * W, "input feature has wrong size"
 
         shortcut = x
@@ -377,11 +379,12 @@ class BasicLayer(nn.Module):
         attn_mask = attn_mask.masked_fill(attn_mask != 0, float(-100.0)).masked_fill(attn_mask == 0, float(0.0))
 
         for blk in self.blocks:
-            blk.H, blk.W = H, W
+            # print('blk:{}, {}'.format(H, W) )
+            # blk.H, blk.W = H, W
             if self.use_checkpoint:
-                x = checkpoint.checkpoint(blk, x, attn_mask)
+                x = checkpoint.checkpoint(blk, x, attn_mask, H, W)
             else:
-                x = blk(x, attn_mask)
+                x = blk(x, attn_mask, H, W)
         if self.downsample is not None:
             x_down = self.downsample(x, H, W)
             Wh, Ww = (H + 1) // 2, (W + 1) // 2
@@ -637,6 +640,7 @@ class SwinTransformer(nn.Module):
         x = self.patch_embed(x)
 
         Wh, Ww = x.size(2), x.size(3)
+        # print(Wh, Ww)
         if self.ape:
             # interpolate the position embedding to the corresponding size
             absolute_pos_embed = F.interpolate(self.absolute_pos_embed, size=(Wh, Ww), mode='bicubic')
@@ -681,7 +685,7 @@ class SwinTransformer(nn.Module):
 
 
 def build_swin_transformer(modelname, pretrain_img_size, **kw):
-    assert modelname in ['swin_T_224_1k', 'swin_B_224_22k', 'swin_B_384_22k', 'swin_L_224_22k', 'swin_L_384_22k']
+    assert modelname in ['swin_T_224_1k', 'swin_B_224_22k', 'swin_B_384_22k', 'swin_L_224_22k', 'swin_L_384_22k', 'swin_B_192_22k']
 
     model_para_dict = {
         'swin_T_224_1k': dict(
@@ -713,6 +717,12 @@ def build_swin_transformer(modelname, pretrain_img_size, **kw):
             depths=[ 2, 2, 18, 2 ],
             num_heads=[ 6, 12, 24, 48 ],
             window_size=12
+        ),
+        'swin_B_192_22k': dict(
+            embed_dim=128,
+            depths=[ 2, 2, 18, 2 ],
+            num_heads=[ 4, 8, 16, 32 ],
+            window_size=6
         ),
     }
     kw_cgf = model_para_dict[modelname]

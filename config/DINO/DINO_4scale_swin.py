@@ -1,6 +1,7 @@
 _base_ = ['coco_transformer.py']
 
-num_classes=91
+num_classes = 2
+template_lvl = 4
 
 lr = 0.0001
 param_dict_type = 'default'
@@ -9,7 +10,7 @@ lr_backbone_names = ['backbone.0']
 lr_linear_proj_names = ['reference_points', 'sampling_offsets']
 lr_linear_proj_mult = 0.1
 ddetr_lr_param = False
-batch_size = 2
+# batch_size = 2
 weight_decay = 0.0001
 epochs = 12
 lr_drop = 11
@@ -22,8 +23,9 @@ lr_drop_list = [33, 45]
 
 modelname = 'dino'
 frozen_weights = None
-backbone = 'swin_L_384_22k'
-use_checkpoint = True
+backbone = 'swin_B_192_22k'
+backbone_dir = 'Dataset/backbone'
+use_checkpoint = False
 
 dilation = False
 position_embedding = 'sine'
@@ -39,7 +41,7 @@ dim_feedforward = 2048
 hidden_dim = 256
 dropout = 0.0
 nheads = 8
-num_queries = 900
+num_queries = 600
 query_dim = 4
 num_patterns = 0
 pdetr3_bbox_embed_diff_each_layer = False
@@ -60,7 +62,7 @@ dln_xy_noise = 0.2
 dln_hw_noise = 0.2
 add_channel_attention = False
 add_pos_value = False
-two_stage_type = 'standard'
+two_stage_type = 'no'
 two_stage_pat_embed = 0
 two_stage_add_query_num = 0
 two_stage_bbox_embed_share = False
@@ -68,7 +70,7 @@ two_stage_class_embed_share = False
 two_stage_learn_wh = False
 two_stage_default_hw = 0.05
 two_stage_keep_all_tokens = False
-num_select = 300
+num_select = 600
 transformer_activation = 'relu'
 batch_norm_type = 'FrozenBatchNorm2d'
 masks = False
@@ -100,7 +102,7 @@ dn_number = 100
 dn_box_noise_scale = 0.4
 dn_label_noise_ratio = 0.5
 embed_init_tgt = True
-dn_labelbook_size = 91
+dn_labelbook_size = 2
 
 match_unstable_error = True
 
