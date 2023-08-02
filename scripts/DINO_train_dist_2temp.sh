@@ -23,7 +23,7 @@ python -m torch.distributed.run --nproc_per_node=${GPUS} \
     --rank ${RANK} \
     --config_file config/DINO/DINO_4scale_swin.py \
     --n_nodes ${NODE_COUNT} \
-    --batch_size=1 \
+    --batch_size=2 \
     --output_dir $out_put_dir \
     # --dn_for_track \
     # --find_unused_params
