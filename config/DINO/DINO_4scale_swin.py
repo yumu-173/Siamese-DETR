@@ -23,7 +23,7 @@ lr_drop_list = [11, 20, 30]
 
 modelname = 'dino'
 frozen_weights = None
-backbone = 'swin_B_192_22k'
+backbone = 'swin_B_384_22k'
 backbone_dir = 'Dataset/backbone'
 use_checkpoint = False
 
