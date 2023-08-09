@@ -960,8 +960,8 @@ class CocoDetection(torchvision.datasets.CocoDetection):
                 else:
                     box = deepcopy(template_anno[0]['bbox'])
                     # box = template_anno[0]['bbox']
-                box[2] = box[0] + max(1, box[2])
-                box[3] = box[1] + max(box[3], 1)
+                box[2] = box[0] + max(2, box[2])
+                box[3] = box[1] + max(box[3], 2)
                 template = new_img.crop(box)
                 # template_show = True
                 # if template_show:
@@ -1011,7 +1011,8 @@ class CocoDetection(torchvision.datasets.CocoDetection):
                 T.ToTensor(),
                 T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
             ])
-            for template in template_list:    
+            for template in template_list: 
+                # print(template.size)
                 template, _ = T.resize(template, target=None, size=400, max_size=400)
                 # print(template)
                 template, _ = tran_template(template, target)
