@@ -93,11 +93,15 @@ def get_args_parser():
     parser.add_argument('--temp_in_image', default=False, type=bool, help='find template in current image')
     parser.add_argument('--det_with_gt', default=False, type=bool, help='use gt as query box')
     parser.add_argument('--test_panda', default=False, action='store_true', help='test panda')
+    
+    # new train dataset
     parser.add_argument('--train_with_coco_lasot_got', default=False, action='store_true', help='train with coco, lasot and got')
     parser.add_argument('--train_with_o365', default=False, action='store_true', help='train with objects365.json')
     parser.add_argument('--train_with_od', default=False, action='store_true', help='train with od.json')
     parser.add_argument('--train_with_gmot', default=False, action='store_true', help='train with gmot')
     parser.add_argument('--dn_for_track', default=False, action='store_true', help='set dn scale')
+    parser.add_argument('--test_mot17', default=False, action='store_true', help='test with mot17')
+    parser.add_argument('--train_lvis', default=False, action='store_true', help='test with lvis')
 
 
     # distributed training parameters
@@ -230,6 +234,12 @@ def main(args):
     if args.train_with_coco_lasot_got:
         dataset_train = build_dataset(image_set='train_coco_lasot_got', args=args)
         dataset_val = build_dataset(image_set='val_coco_lasot_got', args=args)
+    elif args.train_lvis:
+        dataset_train = build_dataset(image_set='train_lvis', args=args)
+        dataset_val = build_dataset(image_set='val_lvis', args=args)
+    elif args.test_mot17:
+        dataset_train = build_dataset(image_set='train_mot17', args=args)
+        dataset_val = build_dataset(image_set='val_mot17', args=args)
     elif args.train_with_od:
         dataset_train = build_dataset(image_set='train_od', args=args)
         dataset_val = build_dataset(image_set='val_od', args=args)
@@ -359,7 +369,10 @@ def main(args):
         return
     
     if args.test:
-        dataset_test = build_dataset(image_set='test', args=args)
+        if args.test_mot17:
+            dataset_test = build_dataset(image_set='test_mot17', args=args)
+        else:
+            dataset_test = build_dataset(image_set='test', args=args)
         sampler_test = torch.utils.data.RandomSampler(dataset_test)
         batch_sampler_test = torch.utils.data.BatchSampler(sampler_test, args.batch_size, drop_last=True)
         data_loader_test = DataLoader(dataset_test, batch_sampler=batch_sampler_test,

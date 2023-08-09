@@ -374,7 +374,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         self.class_dict = {}
         # if image_set in ['train', 'val']:
         #     self.class_weight = {}
-        if image_set in ['test', 'test_ov', 'train', 'val']:
+        if image_set in ['test', 'test_ov', 'train', 'val', 'test_mot17']:
             self.template_list = {}
         # if image_set == 'train':
         #     self.ids = sorted(self.ids)
@@ -428,6 +428,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
             path = self.coco.loadImgs(i)[0]["file_name"]
             sequence_name = path.split('/')[1]
             image_name = path.split('/')[-1]
+            # import pdb; pdb.set_trace()
             if sequence_name not in self.class_dict.keys():
                 self.class_dict[sequence_name] = {'image':[], 'template':[]}
                 self.class_dict[sequence_name]['image'].append(i)
@@ -435,6 +436,9 @@ class CocoDetection(torchvision.datasets.CocoDetection):
                 self.class_dict[sequence_name]['image'].append(i)
             
             if image_name == '000000.jpg':
+                self.class_dict[sequence_name]['template_img'] = i
+                self.class_dict[sequence_name]['template'] = self._load_target(i)
+            elif image_name == '000302.jpg' and self.image_set == 'test_mot17':
                 self.class_dict[sequence_name]['template_img'] = i
                 self.class_dict[sequence_name]['template'] = self._load_target(i)
             # print(path)
@@ -505,7 +509,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         return len(self.ids)
 
     def __getitem__(self, idx):
-        if self.image_set == 'test':
+        if self.image_set in ['test', 'test_mot17']:
             return self.getitem_test(idx)
         elif self.image_set == 'panda':
             return self.getitem_panda(idx)
@@ -755,11 +759,10 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         target = {'image_id': image_id, 'annotations': target}
 
         for key in self.class_dict.keys():
+            # import pdb; pdb.set_trace()
             if self.class_dict[key]['image'].count(image_id):
                 # print('sequence:', key)
                 if key not in self.template_list.keys():
-                    # random.seed(2)
-                    # template_idx = random.randint(0, len(self.class_dict[key]['template'])-1)
                     # template group 1
                     # template = Image.open('template/gmot1/' + key +'.jpg')
 
@@ -775,14 +778,17 @@ class CocoDetection(torchvision.datasets.CocoDetection):
                     # save template id
                     # with open('template/group3.txt', 'a') as f:
                     #     f.write(key + ':' + str(template_idx) + '\n')
-
-                    # box = self.class_dict[key]['template'][template_idx]['bbox']
-                    # box[2] = box[0] + max(1, box[2])
-                    # box[3] = box[1] + max(box[3], 1)
-                    # # print(box)
-                    # temp_image_id = self.class_dict[key]['template_img']
-                    # template_img = self._load_image(temp_image_id)
-                    # template = template_img.crop(box)
+                    # if self.image_set == 'test_mot17':
+                    #     random.seed(2)
+                    #     # import pdb; pdb.set_trace()
+                    #     template_idx = random.randint(0, len(self.class_dict[key]['template'])-1)
+                    #     box = self.class_dict[key]['template'][template_idx]['bbox']
+                    #     box[2] = box[0] + max(1, box[2])
+                    #     box[3] = box[1] + max(box[3], 1)
+                    # # # print(box)
+                        # temp_image_id = self.class_dict[key]['template_img']
+                        # template_img = self._load_image(temp_image_id)
+                        # template = template_img.crop(box)
                     # template.save('template/gmot3/'+key+'.jpg')
 
                     self.template_list[key] = template
@@ -1144,7 +1150,7 @@ class ConvertCocoPolysToMask(object):
 
         if self.image_set in ['train', 'train_ov', 'val_ov', 'val', 'train_cur', 'train_coco_lasot_got', 
                               'val_coco_lasot_got', 'train_o365', 'val_o365', 'train_gmot',
-                              'train_od', 'val_od']:
+                              'train_od', 'val_od', 'train_mot17', 'val_mot17', 'train_lvis', 'val_lvis']:
             template = [obj["template_id"] for obj in anno]
             template = torch.tensor(template, dtype=torch.int64)
         # print('template_id', template)
@@ -1174,7 +1180,7 @@ class ConvertCocoPolysToMask(object):
         classes = classes[keep]
         if self.image_set in ['train', 'train_ov', 'val_ov', 'val', 'train_cur', 'train_coco_lasot_got', 
                               'val_coco_lasot_got', 'train_o365', 'val_o365', 'train_gmot',
-                              'train_od', 'val_od']:
+                              'train_od', 'val_od', 'train_mot17', 'val_mot17', 'train_lvis', 'val_lvis']:
             template = template[keep]
         # import pdb; pdb.set_trace()
         if self.return_masks:
@@ -1190,7 +1196,7 @@ class ConvertCocoPolysToMask(object):
         target["image_id"] = image_id
         if self.image_set in ['train', 'train_ov', 'val_ov', 'val', 'train_cur', 'train_gmot',
                               'train_coco_lasot_got', 'val_coco_lasot_got', 'train_o365', 'val_o365',
-                              'train_od', 'val_od']:
+                              'train_od', 'val_od', 'train_mot17', 'val_mot17', 'train_lvis', 'val_lvis']:
             target["template_id"] = template
         if keypoints is not None:
             target["keypoints"] = keypoints
@@ -1351,7 +1357,7 @@ def make_coco_transforms(image_set, fix_size=False, strong_aug=False, args=None)
 
     if image_set in ['val', 'eval_debug', 'train_adj', 'test', 'train_ov', 'val_ov', 'test_ov', 'train_cur', 
                      'panda', 'train_coco_lasot_got', 'val_coco_lasot_got', 'train_o365', 'val_o365', 'train_gmot',
-                     'train_od', 'val_od']:
+                     'train_od', 'val_od', 'train_mot17', 'test_mot17', 'val_mot17', 'train_lvis', 'val_lvis']:
 
         if os.environ.get("GFLOPS_DEBUG_SHILONG", False) == 'INFO':
             print("Under debug mode for flops calculation only!!!!!!!!!!!!!!!!")
@@ -1467,6 +1473,11 @@ def build(image_set, args):
         "val_o365": (root / 'val', root / f'objects365_val.json'),
         "train_od": (root / 'train', root / f'od_train.json'),
         "val_od": (root / 'val', root / f'od_val.json'),
+        "train_mot17": (root / 'train', root / "annotations" / f'train.json'),
+        "val_mot17": (root / 'train', root / "annotations" / f'val_half.json'),
+        "test_mot17": (root / 'train', root / "annotations" / f'val_half.json'),
+        "train_lvis": (root , root / "lvis_annotations" / f'lvis_v3_train.json'),
+        "val_lvis": (root , root / "lvis_annotations" / f'lvis_v3_val.json'),
         # "test": (root / "test2017", root / "annotations" / 'image_info_test-dev2017.json' ),
     }
 
@@ -1505,9 +1516,9 @@ def build(image_set, args):
                 image_set=image_set,
                 aux_target_hacks=aux_target_hacks_list,
                 number_template=args.number_template,
-                # num_imgs=100,
+                # num_imgs=1000,
             )
-    if image_set == 'test':
+    if image_set in ['test', 'test_mot17']:
         dataset.get_sequence_id_to_img_id()
         # print(dataset.class_dict)
     elif image_set == 'test_track':
