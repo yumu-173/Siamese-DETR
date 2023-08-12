@@ -1013,7 +1013,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
             ])
             for template in template_list: 
                 # print(template.size)
-                template, _ = T.resize(template, target=None, size=400, max_size=400)
+                template, _ = T.resize(template, target=None, size=(480, 480), max_size=800)
                 # print(template)
                 template, _ = tran_template(template, target)
                 # print('template:', template.shape)
