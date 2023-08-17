@@ -920,7 +920,8 @@ class CocoDetection(torchvision.datasets.CocoDetection):
             while len(temp_ann) < self.number_template:
                 temp_ann += deepcopy(target['annotations'])
             # temp_ann = target['annotations']
-            num_template = min(self.number_template, len(temp_ann))
+            # num_template = min(self.number_template, len(temp_ann))
+            num_template = self.number_template
             # category_list = [x['category_id'] for x in temp_ann]
             # choise_list = torch.tensor(list(set(category_list)))
             # category_list = torch.tensor(category_list)

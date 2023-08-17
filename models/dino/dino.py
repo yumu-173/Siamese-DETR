@@ -203,6 +203,7 @@ class DINO(nn.Module):
                 )])
 
         self.backbone = backbone
+        # self.template_backbone = template_backbone
         self.aux_loss = aux_loss
         self.box_pred_damping = box_pred_damping = None
 
@@ -335,10 +336,15 @@ class DINO(nn.Module):
             template.extend(template_list[:num_temp])
         # import pdb; pdb.set_trace()
         templates = nested_tensor_from_tensor_list(template).to('cuda')
-
+        # import pdb; pdb.set_trace()
+        # temp_features, temp_poss = self.template_backbone(templates)
+        # print('---template_begin---')
+        # print(templates.shape)
         temp_features, temp_poss = self.backbone(templates)
+        # print('---template_over---')
         # import pdb; pdb.set_trace()
         features, poss = self.backbone(samples)
+        # import pdb; pdb.set_trace()
         # --------------------------------------------------------------------------------------------------------------
         # print('samples:', samples.shape)
         # print('templates:', templates.shape)
@@ -436,7 +442,8 @@ class DINO(nn.Module):
                 temp_pos_l = self.backbone[1](NestedTensor(temp_src, temp_mask)).to(temp_src.dtype)
                 temp_srcs.append(temp_src)
                 temp_masks.append(temp_mask)
-                temp_poss.append(temp_pos_l) 
+                temp_poss.append(temp_pos_l)
+        # import pdb; pdb.set_trace()
         # if self.dn_number > 0 and targets is not None:
         #     input_query_label, input_query_bbox, attn_mask, dn_meta =\
         #         prepare_for_cdn(dn_args=(targets, self.dn_number, self.dn_label_noise_ratio, self.dn_box_noise_scale),
@@ -946,6 +953,7 @@ class PostProcess(nn.Module):
             results = [{'scores': s, 'labels': l, 'boxes': b} for s, l, b in zip(scores, labels, boxes)]
         # print(num_select)
         # return results, topk_boxes
+        # import pdb; pdb.set_trace()
         if num_select != self.num_select:
             return results, topk_boxes
         else:
@@ -974,6 +982,7 @@ def build_dino(args):
     device = torch.device(args.device)
 
     backbone = build_backbone(args)
+    # template_backbone = build_backbone(args)
 
     transformer = build_deformable_transformer(args)
 
@@ -996,6 +1005,7 @@ def build_dino(args):
 
     model = DINO(
         backbone,
+        # template_backbone,
         transformer,
         num_classes=num_classes,
         num_queries=args.num_queries,

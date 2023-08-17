@@ -99,7 +99,7 @@ def get_args_parser():
     parser.add_argument('--train_with_o365', default=False, action='store_true', help='train with objects365.json')
     parser.add_argument('--train_with_od', default=False, action='store_true', help='train with od.json')
     parser.add_argument('--train_with_gmot', default=False, action='store_true', help='train with gmot')
-    parser.add_argument('--dn_for_track', default=False, action='store_true', help='set dn scale')
+    # parser.add_argument('--dn_for_track', default=False, action='store_true', help='set dn scale')
     parser.add_argument('--test_mot17', default=False, action='store_true', help='test with mot17')
     parser.add_argument('--train_lvis', default=False, action='store_true', help='test with lvis')
 
