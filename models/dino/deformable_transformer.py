@@ -516,7 +516,7 @@ class DeformableTransformer(nn.Module):
                 tgt_, template_feature = self.init_tgt_embed(self.num_queries // self.template_lvl, template_features, temp_masks, self.number_template)
                 template_feature = template_feature / self.template_lvl
             if self.dn_type == 'sample':
-                print('***********************************sample*************************************')
+                # print('***********************************sample*************************************')
                 #prepare for dsn
                 # import pdb; pdb.set_trace()
                 tgt, refpoint_embed, attn_mask, dn_meta =\
@@ -524,7 +524,7 @@ class DeformableTransformer(nn.Module):
                                                 training=self.training, num_queries=self.num_queries, hidden_dim=self.d_model, query_label=tgt_)
                 # import pdb; pdb.set_trace()
             elif self.dn_type == 'origin':
-                print('***********************************oridin*************************************')
+                # print('***********************************oridin*************************************')
                 tgt, refpoint_embed, attn_mask, dn_meta =\
                     prepare_for_cdn(dn_args=(targets, self.dn_number, self.dn_label_noise_ratio, self.dn_box_noise_scale),
                                     training=self.training,num_queries=self.num_queries,num_classes=self.num_classes,
@@ -549,7 +549,7 @@ class DeformableTransformer(nn.Module):
             else:
                 refpoint_embed, tgt = refpoint_embed_, tgt_
             # merge attn-mask
-            if self.training:
+            if self.training or self.eval:
                 for n in range(self.number_template):
                     if n == 0:
                         merge_mask = attn_mask
