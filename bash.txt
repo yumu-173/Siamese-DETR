@@ -23,3 +23,10 @@ bash scripts/DINO_train_o365.sh Dataset/object365 logs/DINO/R50-MS4-swint-o365
       -train2017
       -val2017
    -object365
+
+新增：
+16卡bs16：
+bash scripts/DINO_train_dist_2temp.sh Dataset/COCO logs/DINO/R50-MS4-swint-real-coco
+bash scripts/DINO_train_lvis.sh Dataset/COCO logs/DINO/R50-MS4-swint-real-lvis
+32卡，bs=32：
+bash scripts/DINO_train_o365.sh Dataset/object365 logs/DINO/R50-MS4-swint-real-o365
