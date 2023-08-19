@@ -395,15 +395,16 @@ def main(args):
         return
     
     if args.test_track:
-        reid_model = Path('ckpts/osnet_ain_x1_0_msmt17.pth')
-        assert os.path.isfile(reid_model)
-        reid_network = FeatureExtractor(
-            model_name='osnet_ain_x1_0',
-            model_path=reid_model,
-            verbose=False,
-            device='cuda' if torch.cuda.is_available() else 'cpu')
+        # reid_model = Path('ckpts/osnet_ain_x1_0_msmt17.pth')
+        # assert os.path.isfile(reid_model)
+        # reid_network = FeatureExtractor(
+        #     model_name='osnet_ain_x1_0',
+        #     model_path=reid_model,
+        #     verbose=False,
+        #     device='cuda' if torch.cuda.is_available() else 'cpu')
 
-        tracker = Tracker(model, reid_network, args)
+        # tracker = Tracker(model, reid_network, args)
+        tracker = Tracker(model, args)
         dataset_test = build_dataset(image_set='test_track', args=args)
         # sampler_test = torch.utils.data.RandomSampler(dataset_test)
         # batch_sampler_test = torch.utils.data.BatchSampler(sampler_test, args.batch_size, drop_last=True)

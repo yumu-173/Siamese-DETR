@@ -530,8 +530,14 @@ class DeformableTransformer(nn.Module):
                                     training=self.training,num_queries=self.num_queries,num_classes=self.num_classes,
                                     hidden_dim=self.d_model,label_enc=self.label_enc)
             else:
-                tgt = refpoint_embed = dn_meta = None
-                attn_mask = torch.zeros((self.num_queries, self.num_queries), dtype=torch.bool).cuda()
+                if self.training:
+                    tgt = refpoint_embed = dn_meta = None
+                    attn_mask = torch.zeros((self.num_queries, self.num_queries), dtype=torch.bool).cuda()
+                else:
+                    tgt = None
+                    refpoint_embed = None
+                    attn_mask = None
+                    dn_meta = None
             # import pdb; pdb.set_trace()
             # import pdb; pdb.set_trace()
             # tgt_ = self.tgt_embed.weight[:, None, :].repeat(1, bs, 1).transpose(0, 1) # nq, bs, d_model
@@ -549,7 +555,7 @@ class DeformableTransformer(nn.Module):
             else:
                 refpoint_embed, tgt = refpoint_embed_, tgt_
             # merge attn-mask
-            if self.training or self.eval:
+            if self.training:
                 for n in range(self.number_template):
                     if n == 0:
                         merge_mask = attn_mask

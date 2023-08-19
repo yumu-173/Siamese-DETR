@@ -269,13 +269,17 @@ class PatchMerging(nn.Module):
         """
         B, L, C = x.shape
         assert L == H * W, "input feature has wrong size"
+        # import pdb; pdb.set_trace()
 
         x = x.view(B, H, W, C)
 
         # padding
         pad_input = (H % 2 == 1) or (W % 2 == 1)
+        # print(x.shape)
+        # print('pad_input:{}'.format(pad_input))
         if pad_input:
             x = F.pad(x, (0, 0, 0, W % 2, 0, H % 2))
+            # print('padding:{}'.format(x.shape))
 
         x0 = x[:, 0::2, 0::2, :]  # B H/2 W/2 C
         x1 = x[:, 1::2, 0::2, :]  # B H/2 W/2 C

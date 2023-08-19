@@ -19,9 +19,10 @@ class Tracker:
     # only track pedestrian
     cl = 1
 
-    def __init__(self, obj_detect, reid_network, tracker_cfg):
+    # def __init__(self, obj_detect, reid_network, tracker_cfg):
+    def __init__(self, obj_detect, tracker_cfg):
         self.obj_detect = obj_detect
-        self.reid_network = reid_network
+        # self.reid_network = reid_network
         self.detection_person_thresh = tracker_cfg.detection_person_thresh
         self.regression_person_thresh = tracker_cfg.regression_person_thresh
         self.regression_iou_thresh = tracker_cfg.regression_iou_thresh
@@ -51,8 +52,10 @@ class Tracker:
 
         self.load_results =tracker_cfg.load_results
         if self.load_results:
+            # print(self.load_results)
+            # exit(0)
             self.det_results = {}
-            with open('logs/DINO/R50-MS4-1/results_gmotdet_name.json') as f:
+            with open('logs/DINO/rebuttal/yolo_fitler_name.json') as f:
                 gmot_det = json.load(f)
             for item in gmot_det:
                 seq_name = item['image_id'].split('/')[-3]
@@ -389,7 +392,9 @@ class Tracker:
                 # import pdb; pdb.set_trace()
             else:
                 det_results = postprocessors['bbox'](outputs, orig_target_sizes, not_to_xyxy=True)
+                # det_results, box_index = postprocessors['bbox'](outputs, orig_target_sizes, not_to_xyxy=True)
             # import pdb; pdb.set_trace()
+            # print(det_results)
             scores = det_results[0]['scores']
             boxes = det_results[0]['boxes']
             labels = det_results[0]['labels'].bool()
@@ -402,10 +407,12 @@ class Tracker:
                 # import pdb; pdb.set_trace()
                 seq_name = image_name.split('/')[-3]
                 frame_id = int(image_name.split('/')[-1][:-4])
+                # import pdb; pdb.set_trace()
                 if frame_id in self.det_results[seq_name].keys():
                     boxes = torch.tensor(self.det_results[seq_name][frame_id]).cuda()
                     scores = torch.ones(boxes.shape[0]).cuda()
                 else:
+                    boxes = torch.tensor([0,0,1,1]).cuda()
                     scores = torch.zeros(boxes.shape[0]).cuda()
                 # import pdb; pdb.set_trace()
 
