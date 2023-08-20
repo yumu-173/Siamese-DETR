@@ -25,6 +25,6 @@ python -m torch.distributed.run --nproc_per_node=${GPUS} \
     --n_nodes ${NODE_COUNT} \
     --batch_size=1 \
     --output_dir $out_put_dir \
-    --train_lvis
+    # --train_lvis
     # --dn_for_track \
     # --find_unused_params
