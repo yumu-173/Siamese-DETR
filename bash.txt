@@ -30,3 +30,9 @@ bash scripts/DINO_train_coco_swint.sh Dataset/COCO logs/DINO/R50-MS4-swint-real-
 bash scripts/DINO_train_lvis_swint.sh Dataset/COCO logs/DINO/R50-MS4-swint-real-lvis
 32卡，bs=32：
 bash scripts/DINO_train_o365_swint.sh Dataset/object365 logs/DINO/R50-MS4-swint-real-o365
+
+8.23新增：
+8卡，bs=16：
+bash scripts/DINO_train_dist_nodn.sh Dataset/COCO logs/DINO/R50-MS4-1temp-no 1
+16卡bs16：
+bash scripts/DINO_train_coco_simb.sh Dataset/COCO logs/DINO/R50-MS4-simb
