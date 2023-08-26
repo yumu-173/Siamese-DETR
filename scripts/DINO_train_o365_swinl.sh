@@ -13,7 +13,6 @@ echo "master port: ${MASTER_PORT}"
 
 coco_path=$1
 out_put_dir=$2
-number_template=$3
 python -m torch.distributed.run --nproc_per_node=${GPUS} \
     --nnodes ${NODE_COUNT} \
     --node_rank ${RANK} \
@@ -22,9 +21,8 @@ python -m torch.distributed.run --nproc_per_node=${GPUS} \
     main.py \
     --coco_path $coco_path \
     --rank ${RANK} \
-    --config_file config/DINO/DINO_4scale_swint.py \
+    --config_file config/DINO/DINO_4scale_swinl.py \
     --n_nodes ${NODE_COUNT} \
     --batch_size=1 \
     --output_dir $out_put_dir \
-    --dn_type origin \
-    --find_unused_params
+    --train_with_o365

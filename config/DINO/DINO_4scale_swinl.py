@@ -12,18 +12,18 @@ lr_linear_proj_mult = 0.1
 ddetr_lr_param = False
 # batch_size = 2
 weight_decay = 0.0001
-epochs = 12
+epochs = 36
 lr_drop = 11
 save_checkpoint_interval = 1
 clip_max_norm = 0.1
 onecyclelr = False
-multi_step_lr = False
+multi_step_lr = True
 lr_drop_list = [11, 20, 30]
 
 
 modelname = 'dino'
 frozen_weights = None
-backbone = 'swin_T_224_1k'
+backbone = 'swin_L_384_22k'
 backbone_dir = 'Dataset/backbone'
 use_checkpoint = False
 

@@ -112,3 +112,61 @@ ema_decay = 0.9997
 ema_epoch = 0
 
 use_detached_boxes_dec_out = False
+
+# tracktor
+interpolate = False
+# [False, 'debug', 'pretty']
+# compile video with: `ffmpeg -f image2 -framerate 15 -i %06d.jpg -vcodec libx264 -y movie.mp4 -vf scale=320:-1`
+write_images = False
+# load tracking results if available and only evaluate
+load_results = False
+# dataset (look into tracker/datasets/factory.py)
+dataset = 'mot17_train_FRCNN'
+# start and end percentage of frames to run, e.g., [0.0, 0.5] for train and [0.75, 1.0] for val split.
+frame_range = {
+  'start': 0.0,
+  'end': 1.0
+}
+# FRCNN score threshold for detections
+detection_person_thresh = 0.25
+# FRCNN score threshold for keeping the track alive
+regression_person_thresh = 0.05
+regression_iou_thresh = 0.7
+# NMS threshold for detection
+detection_nms_thresh = 0.5
+# NMS theshold while tracking
+regression_nms_thresh = 0.5
+# motion model settings
+motion_model = {
+    'enabled': False, 
+    # average velocity over last n_steps steps
+    'n_steps': 5,
+    # if true, only model the movement of the bounding box center. If false, width and height are also modeled.
+    'center_only': False
+}
+    
+# DPM or DPM_RAW or 0, raw includes the unfiltered (no nms) versions of the provided detections,
+# 0 tells the tracker to use private detections (Faster R-CNN)
+public_detections = False
+# Do camera motion compensation
+do_align = False
+# Which warp mode to use (MOTION_EUCLIDEAN, MOTION_AFFINE, ...)
+warp_mode = 'MOTION_EUCLIDEAN'
+# maximal number of iterations (original 50)
+number_of_iterations = 150
+# Threshold increment between two iterations (original 0.001)
+termination_eps = 0.00001
+# Use siamese network to do reid
+do_reid = True
+# How much timesteps dead tracks are kept and cosidered for reid
+inactive_patience = 50
+# How many last appearance features are to keep
+max_features_num = 10
+# How similar do image and old track need to be to be considered the same person
+reid_sim_threshold = 800.0
+# How much IoU do track and image need to be considered for matching
+reid_iou_threshold = 0.4
+
+load_results = False
+
+oracle = None
