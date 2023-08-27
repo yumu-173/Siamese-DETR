@@ -50,4 +50,4 @@ bash scripts/DINO_train_dist_oridn.sh Dataset/COCO logs/DINO/R50-MS4-swint-origi
 bash scripts/DINO_train_swint_nodn.sh Dataset/COCO logs/DINO/R50-MS4-swint-5temp-no 5
 
 32卡，bs=32
-bash scripts/DINO_train_o365_swinl.sh Dataset/COCO logs/DINO/R50-MS4-swinl-o365
+bash scripts/DINO_train_o365_swinl.sh Dataset/object365 logs/DINO/R50-MS4-swinl-o365
