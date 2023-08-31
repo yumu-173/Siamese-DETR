@@ -14,6 +14,7 @@ echo "master port: ${MASTER_PORT}"
 coco_path=$1
 out_put_dir=$2
 number_template=$3
+batch_size=$4
 python -m torch.distributed.run --nproc_per_node=${GPUS} \
     --nnodes ${NODE_COUNT} \
     --node_rank ${RANK} \
@@ -24,7 +25,7 @@ python -m torch.distributed.run --nproc_per_node=${GPUS} \
     --rank ${RANK} \
     --config_file config/DINO/DINO_4scale_2temp.py \
     --n_nodes ${NODE_COUNT} \
-    --batch_size=1 \
+    --batch_size $batch_size \
     --output_dir $out_put_dir \
     --number_template $number_template \
     --dn_type no \
