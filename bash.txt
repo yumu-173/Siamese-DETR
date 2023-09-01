@@ -60,4 +60,5 @@ bash scripts/DINO_train_swint_nodn.sh Dataset/COCO logs/DINO/R50-MS4-swint-8temp
 bash scripts/DINO_train_swint_nodn.sh Dataset/COCO logs/DINO/R50-MS4-swint-9temp-no 9 1
 
 9.1新增
+8卡，bs=16
 bash scripts/DINO_train_dist_4l_noback.sh Dataset/COCO logs/DINO/R50-MS4-swint-1temp-noback
