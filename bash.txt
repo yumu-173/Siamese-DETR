@@ -58,3 +58,6 @@ bash scripts/DINO_train_swint_nodn.sh Dataset/COCO logs/DINO/R50-MS4-swint-6temp
 bash scripts/DINO_train_swint_nodn.sh Dataset/COCO logs/DINO/R50-MS4-swint-7temp-no 7 1
 bash scripts/DINO_train_swint_nodn.sh Dataset/COCO logs/DINO/R50-MS4-swint-8temp-no 8 1
 bash scripts/DINO_train_swint_nodn.sh Dataset/COCO logs/DINO/R50-MS4-swint-9temp-no 9 1
+
+9.1新增
+bash scripts/DINO_train_dist_4l_noback.sh Dataset/COCO logs/DINO/R50-MS4-swint-1temp-noback
