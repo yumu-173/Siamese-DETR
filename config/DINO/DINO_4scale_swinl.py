@@ -3,7 +3,7 @@ _base_ = ['coco_transformer.py']
 num_classes = 2
 template_lvl = 4
 
-lr = 0.00005
+lr = 0.00001
 param_dict_type = 'default'
 lr_backbone = 1e-05
 lr_backbone_names = ['backbone.0']
