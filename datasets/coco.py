@@ -518,9 +518,9 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         elif self.image_set == 'train_cur':
             # use template in current image
             return self.get_item_ablation2(idx)
-        elif self.number_template == 1:
-            # no background class
-            return self.get_item_ablation(idx)
+        # elif self.number_template == 1:
+        #     # no background class
+        #     return self.get_item_ablation(idx)
         else:
             return self.getitem_train(idx)
     
@@ -608,7 +608,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         for num in range(self.number_template):
             new_t = {}
             # import pdb; pdb.set_trace()
-            keep = target['labels']==template_class
+            keep = target['labels'] == template_class
             # import pdb; pdb.set_trace()
             for key in target.keys():
                 if key in ['boxes', 'labels', 'iscrowd', 'area', 'template_id']:
@@ -770,10 +770,10 @@ class CocoDetection(torchvision.datasets.CocoDetection):
                     # template = Image.open('template/gmot2/' + key +'.jpg')
                     
                     # template group 3
-                    # template = Image.open('template/gmot3/' + key +'.jpg')
+                    template = Image.open('template/gmot3/' + key +'.jpg')
 
                     # template group track
-                    template = Image.open('template/gmot_track/' + key +'.jpg')
+                    # template = Image.open('template/gmot_track/' + key +'.jpg')
 
                     # save template id
                     # with open('template/group3.txt', 'a') as f:
@@ -816,6 +816,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         return img, target, [template]
     
     def getitem_train(self, idx):
+        # exit(0)
         """
         Output:
             - target: dict of multiple items
@@ -1518,7 +1519,7 @@ def build(image_set, args):
                 image_set=image_set,
                 aux_target_hacks=aux_target_hacks_list,
                 number_template=args.number_template,
-                # num_imgs=1000,
+                # num_imgs=10,
             )
     if image_set in ['test', 'test_mot17']:
         dataset.get_sequence_id_to_img_id()

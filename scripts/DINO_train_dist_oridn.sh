@@ -27,4 +27,5 @@ python -m torch.distributed.run --nproc_per_node=${GPUS} \
     --batch_size=1 \
     --output_dir $out_put_dir \
     --dn_type origin \
+    --number_template 7 \
     --find_unused_params
