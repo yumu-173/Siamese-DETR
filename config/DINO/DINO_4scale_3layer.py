@@ -4,7 +4,7 @@ num_classes = 2
 template_lvl = 3
 # number_template = 1
 
-lr = 0.0001
+lr = 0.00005
 param_dict_type = 'default'
 lr_backbone = 1e-05
 lr_backbone_names = ['backbone.0']
@@ -24,7 +24,8 @@ lr_drop_list = [11, 20, 30]
 
 modelname = 'dino'
 frozen_weights = None
-backbone = 'resnet50'
+backbone = 'swin_T_224_1k'
+backbone_dir = 'Dataset/backbone'
 use_checkpoint = False
 
 dilation = False

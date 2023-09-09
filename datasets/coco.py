@@ -577,7 +577,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         temp_cls_list.append(template_class)
         new_img_id = random.choice(self.class_dict[template_class])
         new_idx = self.ids.index(new_img_id)
-        new_idx = self.ids.index(new_img_id)
+        # new_idx = self.ids.index(new_img_id)
         new_img, new_img_target = super(CocoDetection, self).__getitem__(new_idx)
         template_anno = list(filter(lambda item: item['category_id'] == template_class, new_img_target))
         

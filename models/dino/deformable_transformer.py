@@ -380,6 +380,7 @@ class DeformableTransformer(nn.Module):
                 target = feat
             else:
                 target = torch.cat([target, feat], 1)
+            # import pdb; pdb.set_trace()
         return target, template_feature # B x L x C & B x 1 x C
     
     def init_tgt_embed_with_attpool(self, use_num_queries, template_features):
@@ -511,10 +512,11 @@ class DeformableTransformer(nn.Module):
 
         elif self.two_stage_type == 'no':
             if self.attn_pool:
-                tgt_ = self.init_tgt_embed_with_attpool(self.num_queries // self.template_lvl, template_features)
+                tgt_ = self.init_tgt_embed_with_attpool(self.num_queries // 4, template_features)
             else:
-                tgt_, template_feature = self.init_tgt_embed(self.num_queries // self.template_lvl, template_features, temp_masks, self.number_template)
-                template_feature = template_feature / self.template_lvl
+                tgt_, template_feature = self.init_tgt_embed(self.num_queries// 4, template_features, temp_masks, self.number_template)
+                template_feature = template_feature / 4
+                # import pdb; pdb.set_trace()
             if self.dn_type == 'sample':
                 # print('***********************************sample*************************************')
                 #prepare for dsn

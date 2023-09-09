@@ -163,14 +163,20 @@ class DINO(nn.Module):
                 if self.template_lvl <= 3:
                     for _ in range(self.template_lvl):
                         # import pdb; pdb.set_trace()
-                        in_channels = backbone.num_channels[num_backbone_outs - (self.template_lvl - _)]
-                        # print('in_channels:', in_channels)
+                        in_channels = backbone.num_channels[_]
+                        print('in_channels:', in_channels)
                         # import pdb; pdb.set_trace()
                         temp_input_proj_list.append(nn.Sequential(
                             nn.Conv2d(in_channels, hidden_dim, kernel_size=1),
                             nn.GroupNorm(32, hidden_dim),
                         ))
-                    print('temp_input_proj_list', temp_input_proj_list)
+                    for _ in range(num_feature_levels - self.template_lvl):
+                        temp_input_proj_list.append(nn.Sequential(
+                            nn.Conv2d(in_channels, hidden_dim, kernel_size=3, stride=2, padding=1),
+                            nn.GroupNorm(32, hidden_dim),
+                        ))
+                    # print('temp_input_proj_list', temp_input_proj_list)
+                    # import pdb; pdb.set_trace()
                 elif self.template_lvl == 4:
                     for _ in range(num_backbone_outs):
                         # import pdb; pdb.set_trace()
@@ -187,6 +193,8 @@ class DINO(nn.Module):
                             nn.GroupNorm(32, hidden_dim),
                         ))
                         in_channels = hidden_dim
+                # print('temp_input_proj_list', temp_input_proj_list)
+                # import pdb; pdb.set_trace()
                 self.temp_input_proj = nn.ModuleList(temp_input_proj_list)
         else:
             assert two_stage_type == 'no', "two_stage_type should be no if num_feature_levels=1 !!!"
@@ -397,7 +405,12 @@ class DINO(nn.Module):
             masks.append(mask)
             assert mask is not None
         # share weight for template feature ----------------------------------------------------------------------------
-        temp_features = temp_features[-1*self.template_lvl:]
+        new_temp_features = temp_features[-1*self.template_lvl:]
+        # import pdb; pdb.set_trace()
+        for i in range(len(new_temp_features), len(features)):
+            # print(i)
+            temp_features[i] = temp_features[i-1]
+        # print(len(temp_features))
         if self.share_weight:
             # print('**************** True *******************')
             # print(self.share_weight)
@@ -410,6 +423,7 @@ class DINO(nn.Module):
             # print('**************** False ******************')
             for l, feat in enumerate(temp_features):
                 src, mask = feat.decompose()
+                # print(src.shape)
                 temp_srcs.append(self.temp_input_proj[l](src))
                 temp_masks.append(mask)
                 assert temp_masks is not None
@@ -429,7 +443,7 @@ class DINO(nn.Module):
                 poss.append(pos_l)
                 
         # import pdb; pdb.set_trace()
-        if self.template_lvl == 4 and self.num_feature_levels > len(temp_srcs):
+        if self.num_feature_levels > len(temp_srcs):
             _len_srcs = len(temp_srcs)
             # print('_len_srcs', _len_srcs)
             for l in range(_len_srcs, self.num_feature_levels):
