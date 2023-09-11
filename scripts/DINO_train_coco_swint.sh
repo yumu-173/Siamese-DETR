@@ -13,6 +13,7 @@ echo "master port: ${MASTER_PORT}"
 
 coco_path=$1
 out_put_dir=$2
+number_template=$3
 python -m torch.distributed.run --nproc_per_node=${GPUS} \
     --nnodes ${NODE_COUNT} \
     --node_rank ${RANK} \
@@ -25,6 +26,7 @@ python -m torch.distributed.run --nproc_per_node=${GPUS} \
     --n_nodes ${NODE_COUNT} \
     --batch_size=1 \
     --output_dir $out_put_dir \
+    --number_template $number_template
     # --train_lvis
     # --dn_for_track \
     # --find_unused_params
