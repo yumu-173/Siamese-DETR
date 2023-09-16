@@ -191,13 +191,19 @@ def prepare_for_sample_dn(dn_args, training, num_queries, hidden_dim, query_labe
         # reconstruct cannot see each other
         for i in range(dn_number):
             if i == 0:
-                attn_mask[single_pad * 2 * i:single_pad * 2 * (i + 1), single_pad * 2 * (i + 1):pad_size] = True
+                # attn_mask[single_pad * 2 * i:single_pad * 2 * (i + 1), single_pad * 2 * (i + 1):pad_size] = True
+                attn_mask[single_pad * 2 * i:single_pad * 2 * (i + 1), single_pad * 2 * (i + 1):tgt_size] = True
             if i == dn_number - 1:
                 attn_mask[single_pad * 2 * i:single_pad * 2 * (i + 1), :single_pad * i * 2] = True
             else:
-                attn_mask[single_pad * 2 * i:single_pad * 2 * (i + 1), single_pad * 2 * (i + 1):pad_size] = True
+                # attn_mask[single_pad * 2 * i:single_pad * 2 * (i + 1), single_pad * 2 * (i + 1):pad_size] = True
+                attn_mask[single_pad * 2 * i:single_pad * 2 * (i + 1), single_pad * 2 * (i + 1):tgt_size] = True
                 attn_mask[single_pad * 2 * i:single_pad * 2 * (i + 1), :single_pad * 2 * i] = True
-
+        # attn_mask_np = np.array(attn_mask.cpu())
+        # with open('attn_mask.txt', 'w') as f:
+        #     for i in range(len(attn_mask_np)):
+        #         f.write(str(attn_mask_np[i]))
+        # import pdb; pdb.set_trace()
         dn_meta = {
             'pad_size': pad_size,
             'num_dn_group': dn_number,
@@ -341,7 +347,7 @@ def prepare_for_cdn(dn_args, training, num_queries, num_classes, hidden_dim, lab
             else:
                 attn_mask[single_pad * 2 * i:single_pad * 2 * (i + 1), single_pad * 2 * (i + 1):pad_size] = True
                 attn_mask[single_pad * 2 * i:single_pad * 2 * (i + 1), :single_pad * 2 * i] = True
-
+        import ipdb; ipdb.set_trace()
         dn_meta = {
             'pad_size': pad_size,
             'num_dn_group': dn_number,
