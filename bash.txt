@@ -83,3 +83,20 @@ bash scripts/DINO_train_dist_3layer.sh Dataset/COCO logs/DINO/R50-MS4-swint-3lay
 16卡，bs=16
 bash scripts/DINO_train_coco_swint.sh Dataset/COCO logs/DINO/R50-MS4-swint-6temp 6
 bash scripts/DINO_train_coco_swint.sh Dataset/COCO logs/DINO/R50-MS4-swint-7temp 7
+
+9.16新增：
+16卡，bs=16
+bash scripts/DINO_train_coco_swint.sh Dataset/COCO logs/DINO/R50-MS4-swint-7temp 7
+
+9.21新增：
+32卡，bs=32
+bash scripts/DINO_train_o365_swint.sh Dataset/object365 logs/DINO/R50-MS4-swint-o365-dn
+bash scripts/DINO_train_o365.sh Dataset/object365 logs/DINO/R50-MS4-swinb-o365-dn
+
+16卡，bs=16
+bash scripts/DINO_train_dist_2temp.sh Dataset/COCO logs/DINO/R50-MS4-swinb-coco-dn
+bash scripts/DINO_train_lvis.sh Dataset/COCO logs/DINO/R50-MS4-swinb-lvis-dn
+
+8卡，bs=16
+bash scripts/DINO_train_lvis_swint.sh Dataset/COCO logs/DINO/R50-MS4-swint-lvis-dn
+
