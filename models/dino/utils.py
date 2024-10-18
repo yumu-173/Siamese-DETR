@@ -104,6 +104,7 @@ def sigmoid_focal_loss(inputs, targets, num_boxes, alpha: float = 0.25, gamma: f
     Returns:
         Loss tensor
     """
+    # import pdb; pdb.set_trace()
     prob = inputs.sigmoid()
     ce_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction="none")
     p_t = prob * targets + (1 - prob) * (1 - targets)
@@ -112,10 +113,10 @@ def sigmoid_focal_loss(inputs, targets, num_boxes, alpha: float = 0.25, gamma: f
     if alpha >= 0:
         alpha_t = alpha * targets + (1 - alpha) * (1 - targets)
         loss = alpha_t * loss
-
+    # import pdb; pdb.set_trace()
 
     return loss.mean(1).sum() / num_boxes
-
+ 
 class MLP(nn.Module):
     """ Very simple multi-layer perceptron (also called FFN)"""
 
@@ -158,8 +159,10 @@ def gen_sineembed_for_position(pos_tensor):
     y_embed = pos_tensor[:, :, 1] * scale
     pos_x = x_embed[:, :, None] / dim_t
     pos_y = y_embed[:, :, None] / dim_t
+    # import pdb; pdb.set_trace()
     pos_x = torch.stack((pos_x[:, :, 0::2].sin(), pos_x[:, :, 1::2].cos()), dim=3).flatten(2)
     pos_y = torch.stack((pos_y[:, :, 0::2].sin(), pos_y[:, :, 1::2].cos()), dim=3).flatten(2)
+    # import pdb; pdb.set_trace()
     if pos_tensor.size(-1) == 2:
         pos = torch.cat((pos_y, pos_x), dim=2)
     elif pos_tensor.size(-1) == 4:

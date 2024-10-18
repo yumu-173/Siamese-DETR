@@ -55,19 +55,22 @@ class Tracker:
             # print(self.load_results)
             # exit(0)
             self.det_results = {}
-            with open('logs/DINO/rebuttal/yolo_fitler_name.json') as f:
+            with open('logs/DINO/R50-MS4-1/results_conddetr_name.json') as f:
+            # with open('logs/DINO/urban_track/test_result_urban_track_name.json') as f:
                 gmot_det = json.load(f)
             for item in gmot_det:
                 seq_name = item['image_id'].split('/')[-3]
                 frame_id = int(item['image_id'].split('/')[-1][:-4])
                 box = item['bbox']
+                score = item['score']
                 if seq_name not in self.det_results.keys():
                     self.det_results[seq_name] = {}
                 if frame_id not in self.det_results[seq_name].keys():
                     self.det_results[seq_name][frame_id] = []
-                    self.det_results[seq_name][frame_id].append([box[0]+box[2]/2, box[1]+box[3]/2, box[2], box[3]])
+                    self.det_results[seq_name][frame_id].append([box[0]+box[2]/2, box[1]+box[3]/2, box[2], box[3], score])
                 else:
-                    self.det_results[seq_name][frame_id].append([box[0]+box[2]/2, box[1]+box[3]/2, box[2], box[3]])
+                    self.det_results[seq_name][frame_id].append([box[0]+box[2]/2, box[1]+box[3]/2, box[2], box[3], score])
+                # import pdb; pdb.set_trace()
 
     def reset(self, hard=True):
         self.tracks = []
@@ -125,13 +128,13 @@ class Tracker:
             track_pos[:,1] = track_pos[:,1] - track_pos[:,3]/2
             track_pos[:,2] = track_pos[:,0] + track_pos[:,2]
             track_pos[:,3] = track_pos[:,1] + track_pos[:,3]
-            # import pdb; pdb.set_trace()
             iou = torchvision.ops.box_iou(track_pos, box[None, :]).view(-1).item()
-            if iou <= self.regression_iou_thresh:
+            # import pdb; pdb.set_trace()
+            if iou < self.regression_iou_thresh:
                 scores_order[order] = 0
-            elif iou > iou_thresh:
+            elif iou >= iou_thresh:
                 iou_thresh = iou
-                scores_order[order] = self.regression_person_thresh + 1e-5
+                scores_order[order] = max(self.regression_person_thresh + 1e-5, score)
                 boxes_order[order] = box
 
         pos = boxes_order
@@ -378,8 +381,12 @@ class Tracker:
                 track_outouts = {}
                 for key in outputs.keys():
                     if key in ['pred_logits', 'pred_boxes']:
-                        det_outputs[key] = outputs[key][:, :self.num_queries, :]
-                        track_outouts[key] = outputs[key][:, self.num_queries:, :]
+                        # det_outputs[key] = outputs[key][:, :self.num_queries, :]
+                        # track_outouts[key] = outputs[key][:, self.num_queries:, :]
+                        # TODO:
+                        det_outputs[key] = outputs[key][:, -self.num_queries:, :]
+                        track_outouts[key] = outputs[key][:, :-self.num_queries, :]
+
                 det_results = postprocessors['bbox'](det_outputs, orig_target_sizes, not_to_xyxy=True)
                 track_results, box_index = postprocessors['bbox'](track_outouts, orig_target_sizes, not_to_xyxy=False)
                 
@@ -400,17 +407,19 @@ class Tracker:
             labels = det_results[0]['labels'].bool()
             scores = scores[labels]
             boxes = boxes[labels]
-            
 
             if self.load_results:
                 image_name = blob['img_path'][0]
                 # import pdb; pdb.set_trace()
                 seq_name = image_name.split('/')[-3]
                 frame_id = int(image_name.split('/')[-1][:-4])
-                # import pdb; pdb.set_trace()
                 if frame_id in self.det_results[seq_name].keys():
-                    boxes = torch.tensor(self.det_results[seq_name][frame_id]).cuda()
-                    scores = torch.ones(boxes.shape[0]).cuda()
+                    det = torch.tensor(self.det_results[seq_name][frame_id]).cuda()
+                    boxes = det[:, 0:4]
+                    scores = det[:, 4]
+                    # scores = torch.ones(boxes.shape[0]).cuda()
+                    # scores = torch.tensor(self.det_results[seq_name][frame_id]).cuda()
+                    # import pdb; pdb.set_trace()
                 else:
                     boxes = torch.tensor([0,0,1,1]).cuda()
                     scores = torch.zeros(boxes.shape[0]).cuda()
@@ -431,8 +440,8 @@ class Tracker:
         else:
             det_pos = torch.zeros(0).cuda()
             det_scores = torch.zeros(0).cuda()
-        path = blob['img_path'][0]
-        img = cv2.imread(path, 1)
+        # path = blob['img_path'][0]
+        # img = cv2.imread(path, 1)
         ##################
         # Predict tracks #
         ##################
@@ -539,25 +548,26 @@ class Tracker:
             t for t in self.inactive_tracks if t.has_positive_area() and t.count_inactive <= self.inactive_patience
         ]
 
+        # import pdb; pdb.set_trace()
         self.im_index += 1
         self.last_image = blob['img'][0]
 
-        path = blob['img_path'][0]
-        img = cv2.imread(path, 1)
+        # path = blob['img_path'][0]
+        # img = cv2.imread(path, 1)
         # for bbox in self.get_pos():
         #     cv2.rectangle(img, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (0, 255, 0), 1)
-        for i, bbox in enumerate(self.get_pos()):
-            cv2.putText(img, str(self.tracks[i].id), (int(bbox[0]-bbox[2]/2), int(bbox[1]-bbox[3]/2)), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 255), 1)
-            cv2.rectangle(img, (int(bbox[0]-bbox[2]/2), int(bbox[1]-bbox[3]/2)), (int(bbox[0]+bbox[2]/2), int(bbox[1]+bbox[3]/2)), (0, 0, 255), 1)
+        # for i, bbox in enumerate(self.get_pos()):
+        #     cv2.putText(img, str(self.tracks[i].id), (int(bbox[0]-bbox[2]/2), int(bbox[1]-bbox[3]/2)), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 255), 1)
+        #     cv2.rectangle(img, (int(bbox[0]-bbox[2]/2), int(bbox[1]-bbox[3]/2)), (int(bbox[0]+bbox[2]/2), int(bbox[1]+bbox[3]/2)), (0, 0, 255), 1)
         
-        import os
-        seq = 'track_vis/'+path.split('/')[-3]
-        if os.path.exists(seq):
-            pass
-        else:
-            os.mkdir(seq)
-        img_name = seq + '/' + path.split('/')[-1]
-        cv2.imwrite(img_name, img)
+        # import os
+        # seq = 'track_vis/'+path.split('/')[-3]
+        # if os.path.exists(seq):
+        #     pass
+        # else:
+        #     os.mkdir(seq)
+        # img_name = seq + '/' + path.split('/')[-1]
+        # cv2.imwrite(img_name, img)
         # import pdb; pdb.set_trace()
 
     def get_results(self):

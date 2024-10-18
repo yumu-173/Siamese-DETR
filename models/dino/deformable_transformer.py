@@ -422,7 +422,7 @@ class DeformableTransformer(nn.Module):
             bs, c, h, w = src.shape
             spatial_shape = (h, w)
             spatial_shapes.append(spatial_shape)
-
+            # import pdb; pdb.set_trace()
             src = src.flatten(2).transpose(1, 2)                # bs, hw, c
             mask = mask.flatten(1)                              # bs, hw
             pos_embed = pos_embed.flatten(2).transpose(1, 2)    # bs, hw, c
@@ -514,8 +514,9 @@ class DeformableTransformer(nn.Module):
             if self.attn_pool:
                 tgt_ = self.init_tgt_embed_with_attpool(self.num_queries // 4, template_features)
             else:
+                # import pdb; pdb.set_trace()
                 tgt_, template_feature = self.init_tgt_embed(self.num_queries// 4, template_features, temp_masks, self.number_template)
-                template_feature = template_feature / 4
+                # template_feature = template_feature / 4 #TODO: why?
                 # import pdb; pdb.set_trace()
             if self.dn_type == 'sample':
                 # print('***********************************sample*************************************')
@@ -549,7 +550,6 @@ class DeformableTransformer(nn.Module):
             else:
                 refpoint_embed_ = self.refpoint_embed.weight[:, None, :].repeat(1, bs*self.number_template, 1).transpose(0, 1) # nq, bs, 4
             # refpoint_embed_ = torch.cat([refpoint_embed_, refpoint_embed_], dim=1)
-            # import pdb; pdb.set_trace()
             if refpoint_embed is not None:
                 refpoint_embed = torch.cat([refpoint_embed, refpoint_embed_], dim=1)
                 # import pdb; pdb.set_trace()
@@ -557,6 +557,7 @@ class DeformableTransformer(nn.Module):
             else:
                 refpoint_embed, tgt = refpoint_embed_, tgt_
             # merge attn-mask
+            # import pdb; pdb.set_trace()
             if self.training:
                 for n in range(self.number_template):
                     if n == 0:
@@ -568,27 +569,74 @@ class DeformableTransformer(nn.Module):
                         down = torch.cat((torch.ones((len_b, len_a), dtype=torch.bool).cuda(), attn_mask), dim=1)
                         merge_mask = torch.cat((up, down), dim=0)
                 attn_mask = merge_mask
-                # import pdb; pdb.set_trace()
+            
             if track_pos is not None:
+                # # import pdb; pdb.set_trace()
+                # track_num = track_pos.shape[0]
+                # track_pos = inverse_sigmoid(track_pos)
+                # # track_refpoint_embed = track_pos[None, :, :].repeat(1, self.template_lvl, 1)
+                # track_refpoint_embed = track_pos[None, :, :].repeat(1, 4, 1)
+                # # import pdb; pdb.set_trace()
+                # # track_refpoint_embed = track_pos[None, :, :]
+                # refpoint_embed = torch.cat([refpoint_embed, track_refpoint_embed], dim=1)
+                # temp_feat_split = torch.split(template_feature, 1, dim=1)
+                # temp_feat_split = [x.repeat(1, track_num, 1) for x in temp_feat_split]
+                # track_tgt = torch.cat(temp_feat_split, dim=1)
+                # # track_tgt = torch.mean(template_feature, dim=1, keepdim=True).repeat(1, track_num, 1)
+                # tgt = torch.cat([tgt, track_tgt], dim=1)
+
+                # det_mask = torch.zeros((tgt_.shape[1], tgt_.shape[1]), dtype=torch.bool).cuda()
+                # # track_mask = torch.zeros((track_num * self.template_lvl, track_num * self.template_lvl), dtype=torch.bool).cuda()
+                # track_mask = torch.zeros((track_num * 4, track_num * 4), dtype=torch.bool).cuda()
+                # # track_mask = torch.zeros((track_num, track_num), dtype=torch.bool).cuda()
+                # len_a = det_mask.shape[0]
+                # len_b = track_mask.shape[0]
+                # up = torch.cat((det_mask, torch.ones((len_a, len_b), dtype=torch.bool).cuda()), dim=1)
+                # # down = torch.cat((torch.ones((len_b, len_a), dtype=torch.bool).cuda(), track_mask), dim=1)
+                # down = torch.cat((torch.zeros((len_b, len_a), dtype=torch.bool).cuda(), track_mask), dim=1)
+                # attn_mask = torch.cat((up, down), dim=0)
+
+
+
+
+                # import pdb; pdb.set_trace()
                 track_num = track_pos.shape[0]
                 track_pos = inverse_sigmoid(track_pos)
-                track_refpoint_embed = track_pos[None, :, :].repeat(1, self.template_lvl, 1)
+                # track_refpoint_embed = track_pos[None, :, :].repeat(1, self.template_lvl, 1)
+                track_refpoint_embed = track_pos[None, :, :].repeat(1, 4, 1)
+                # import pdb; pdb.set_trace()
                 # track_refpoint_embed = track_pos[None, :, :]
-                refpoint_embed = torch.cat([refpoint_embed, track_refpoint_embed], dim=1)
+                refpoint_embed = torch.cat([track_refpoint_embed, refpoint_embed], dim=1)
                 temp_feat_split = torch.split(template_feature, 1, dim=1)
                 temp_feat_split = [x.repeat(1, track_num, 1) for x in temp_feat_split]
                 track_tgt = torch.cat(temp_feat_split, dim=1)
                 # track_tgt = torch.mean(template_feature, dim=1, keepdim=True).repeat(1, track_num, 1)
-                tgt = torch.cat([tgt, track_tgt], dim=1)
+                tgt = torch.cat([track_tgt, tgt], dim=1)
+                
+                # vis query boxes and tracked boxes
+                # import json
+                # with open('logs/query_boxes.json', 'w') as f:
+                #     query_dict = {
+                #         'query_box': refpoint_embed_[:, -600:, :].sigmoid().cpu().tolist(),
+                #         'track_box': track_pos.sigmoid().cpu().tolist()
+                #         }
+                #     json.dump(query_dict, f, indent=1)
+                #     f.close()
+                # exit(0)
 
                 det_mask = torch.zeros((tgt_.shape[1], tgt_.shape[1]), dtype=torch.bool).cuda()
-                track_mask = torch.zeros((track_num * self.template_lvl, track_num * self.template_lvl), dtype=torch.bool).cuda()
+                # track_mask = torch.zeros((track_num * self.template_lvl, track_num * self.template_lvl), dtype=torch.bool).cuda()
+                track_mask = torch.zeros((track_num * 4, track_num * 4), dtype=torch.bool).cuda()
                 # track_mask = torch.zeros((track_num, track_num), dtype=torch.bool).cuda()
                 len_a = det_mask.shape[0]
                 len_b = track_mask.shape[0]
-                up = torch.cat((det_mask, torch.ones((len_a, len_b), dtype=torch.bool).cuda()), dim=1)
-                down = torch.cat((torch.ones((len_b, len_a), dtype=torch.bool).cuda(), track_mask), dim=1)
+                # up = torch.cat((track_mask, torch.ones((len_b, len_a), dtype=torch.bool).cuda()), dim=1)
+                up = torch.cat((track_mask, torch.zeros((len_b, len_a), dtype=torch.bool).cuda()), dim=1)
+                down = torch.cat((torch.ones((len_a, len_b), dtype=torch.bool).cuda(), det_mask), dim=1)
+
                 attn_mask = torch.cat((up, down), dim=0)
+
+
                 # import pdb; pdb.set_trace()
             # merge query
             target_merge_list = []
@@ -787,7 +835,7 @@ class TransformerEncoder(nn.Module):
             
             if not dropflag:
                 if self.deformable_encoder:
-                    output = layer(src=output, pos=pos, reference_points=reference_points, spatial_shapes=spatial_shapes, level_start_index=level_start_index, key_padding_mask=key_padding_mask)  
+                    output = layer(src=output, pos=pos, reference_points=reference_points, spatial_shapes=spatial_shapes, level_start_index=level_start_index, key_padding_mask=key_padding_mask, layer_id=layer_id)  
                 else:
                     output = layer(src=output.transpose(0, 1), pos=pos.transpose(0, 1), key_padding_mask=key_padding_mask).transpose(0, 1)        
 
@@ -920,12 +968,12 @@ class TransformerDecoder(nn.Module):
         intermediate = []
         reference_points = refpoints_unsigmoid.sigmoid()
         ref_points = [reference_points]  
-
+        
         for layer_id, layer in enumerate(self.layers):
             # preprocess ref points
             if self.training and self.decoder_query_perturber is not None and layer_id != 0:
                 reference_points = self.decoder_query_perturber(reference_points)
-
+            # import pdb; pdb.set_trace()
 
 
             if self.deformable_decoder:
@@ -979,7 +1027,9 @@ class TransformerDecoder(nn.Module):
                     memory_pos=pos,
 
                     self_attn_mask=tgt_mask,
-                    cross_attn_mask=memory_mask
+                    cross_attn_mask=memory_mask,
+
+                    layer_id=layer_id
                 )
 
             # iter update
@@ -1036,7 +1086,7 @@ class DeformableTransformerEncoderLayer(nn.Module):
         super().__init__()
 
         # self attention
-        if use_deformable_box_attn:
+        if use_deformable_box_attn: # default is false
             self.self_attn = MSDeformableBoxAttention(d_model, n_levels, n_heads, n_boxes=n_points, used_func=box_attn_type)
         else:
             self.self_attn = MSDeformAttn(d_model, n_levels, n_heads, n_points)
@@ -1067,9 +1117,9 @@ class DeformableTransformerEncoderLayer(nn.Module):
         src = self.norm2(src)
         return src
 
-    def forward(self, src, pos, reference_points, spatial_shapes, level_start_index, key_padding_mask=None):
+    def forward(self, src, pos, reference_points, spatial_shapes, level_start_index, key_padding_mask=None, layer_id=0):
         # self attention
-        src2 = self.self_attn(self.with_pos_embed(src, pos), reference_points, src, spatial_shapes, level_start_index, key_padding_mask)
+        src2 = self.self_attn(self.with_pos_embed(src, pos), reference_points, src, spatial_shapes, level_start_index, key_padding_mask, layer_id='encoder_sa_{}'.format(layer_id))
         src = src + self.dropout1(src2)
         src = self.norm1(src)
 
@@ -1098,7 +1148,7 @@ class DeformableTransformerDecoderLayer(nn.Module):
 
         # cross attention
         # self.cross_attn = MSDeformAttn(d_model, n_levels, n_heads, n_points)
-        if use_deformable_box_attn:
+        if use_deformable_box_attn: # default is false
             self.cross_attn = MSDeformableBoxAttention(d_model, n_levels, n_heads, n_boxes=n_points, used_func=box_attn_type)
         else:
             self.cross_attn = MSDeformAttn(d_model, n_levels, n_heads, n_points)
@@ -1140,6 +1190,7 @@ class DeformableTransformerDecoderLayer(nn.Module):
         return tensor if pos is None else tensor + pos
 
     def forward_ffn(self, tgt):
+        # import pdb; pdb.set_trace()
         tgt2 = self.linear2(self.dropout3(self.activation(self.linear1(tgt))))
         tgt = tgt + self.dropout4(tgt2)
         tgt = self.norm3(tgt)
@@ -1205,7 +1256,9 @@ class DeformableTransformerDecoderLayer(nn.Module):
 
                 # sa
                 self_attn_mask: Optional[Tensor] = None, # mask used for self-attention
-                cross_attn_mask: Optional[Tensor] = None, # mask used for cross-attention
+                cross_attn_mask: Optional[Tensor] = None, # mask used for cross-attention,
+
+                layer_id='decoder_ca_0'
             ):
         # cross attention
         if self.key_aware_type is not None:
@@ -1218,7 +1271,7 @@ class DeformableTransformerDecoderLayer(nn.Module):
                 raise NotImplementedError("Unknown key_aware_type: {}".format(self.key_aware_type))
         tgt2 = self.cross_attn(self.with_pos_embed(tgt, tgt_query_pos).transpose(0, 1),
                                tgt_reference_points.transpose(0, 1).contiguous(),
-                               memory.transpose(0, 1), memory_spatial_shapes, memory_level_start_index, memory_key_padding_mask).transpose(0, 1)
+                               memory.transpose(0, 1), memory_spatial_shapes, memory_level_start_index, memory_key_padding_mask, layer_id=layer_id).transpose(0, 1)
         tgt = tgt + self.dropout1(tgt2)
         tgt = self.norm1(tgt)
 
@@ -1242,6 +1295,8 @@ class DeformableTransformerDecoderLayer(nn.Module):
                 # sa
                 self_attn_mask: Optional[Tensor] = None, # mask used for self-attention
                 cross_attn_mask: Optional[Tensor] = None, # mask used for cross-attention
+
+                layer_id=0
             ):
 
         for funcname in self.module_seq:
@@ -1251,7 +1306,8 @@ class DeformableTransformerDecoderLayer(nn.Module):
                 tgt = self.forward_ca(tgt, tgt_query_pos, tgt_query_sine_embed, \
                     tgt_key_padding_mask, tgt_reference_points, \
                         memory, memory_key_padding_mask, memory_level_start_index, \
-                            memory_spatial_shapes, memory_pos, self_attn_mask, cross_attn_mask)
+                            memory_spatial_shapes, memory_pos, self_attn_mask, cross_attn_mask, \
+                                layer_id='decoder_ca_{}'.format(layer_id))
             elif funcname == 'sa':
                 tgt = self.forward_sa(tgt, tgt_query_pos, tgt_query_sine_embed, \
                     tgt_key_padding_mask, tgt_reference_points, \

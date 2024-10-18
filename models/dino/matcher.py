@@ -143,6 +143,7 @@ class SimpleMinsumMatcher(nn.Module):
         out_bbox = outputs["pred_boxes"].flatten(0, 1)  # [batch_size * num_queries, 4]
 
         # Also concat the target labels and boxes
+        import pdb; pdb.set_trace()
         tgt_ids = torch.cat([v["labels"] for v in targets])
         tgt_bbox = torch.cat([v["boxes"] for v in targets])
 

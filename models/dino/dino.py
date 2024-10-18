@@ -344,13 +344,20 @@ class DINO(nn.Module):
             template.extend(template_list[:num_temp])
         # import pdb; pdb.set_trace()
         templates = nested_tensor_from_tensor_list(template).to('cuda')
-        # import pdb; pdb.set_trace()
         # temp_features, temp_poss = self.template_backbone(templates)
         # print('---template_begin---')
         # print(templates.shape)
+        
         temp_features, temp_poss = self.backbone(templates)
+        
         # print('---template_over---')
         # import pdb; pdb.set_trace()
+
+        # from thop import profile
+        # flops, params = profile(self.backbone, (templates, ))
+        # print('flops: %.2f M, params: %.2f M' % (flops / 1e6, params / 1e6))
+        # exit(0)
+
         features, poss = self.backbone(samples)
         # import pdb; pdb.set_trace()
         # --------------------------------------------------------------------------------------------------------------
@@ -516,6 +523,7 @@ class DINO(nn.Module):
         # deformable-detr-like anchor update
         # reference_before_sigmoid = inverse_sigmoid(reference[:-1]) # n_dec, bs, nq, 4
         outputs_coord_list = []
+        # import pdb; pdb.set_trace()
         for dec_lid, (layer_ref_sig, layer_bbox_embed, layer_hs) in enumerate(zip(reference[:-1], self.bbox_embed, hs)):
             layer_delta_unsig = layer_bbox_embed(layer_hs)
             layer_outputs_unsig = layer_delta_unsig + inverse_sigmoid(layer_ref_sig)
@@ -611,6 +619,7 @@ class SetCriterion(nn.Module):
         """
         assert 'pred_logits' in outputs
         src_logits = outputs['pred_logits']
+        # import pdb; pdb.set_trace()
         idx = self._get_src_permutation_idx(indices)
         target_classes_o = torch.cat([t["labels"][J] for t, (_, J) in zip(targets, indices)]) 
         target_classes = torch.full(src_logits.shape[:2], self.num_classes,
@@ -934,6 +943,7 @@ class PostProcess(nn.Module):
         # num_select = self.num_select
         num_select = outputs['pred_logits'].shape[1]
         out_logits, out_bbox = outputs['pred_logits'], outputs['pred_boxes']
+        # import pdb; pdb.set_trace()
         assert len(out_logits) == len(target_sizes)
         assert target_sizes.shape[1] == 2
 

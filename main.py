@@ -33,6 +33,8 @@ from tools.tools.coco_categories import fitler_coco_category
 from tools.tools.merge_anno_in_coco_lasot_got import build_annotations
 from torchreid.utils import FeatureExtractor
 
+from ptflops import get_model_complexity_info
+
 def get_args_parser():
     parser = argparse.ArgumentParser('Set transformer detector', add_help=False)
     parser.add_argument('--config_file', '-c', default='config/DINO/DINO_4scale.py', type=str, required=False)
@@ -87,6 +89,7 @@ def get_args_parser():
     parser.add_argument('--ov_coco', type=bool, default=False, help='remove some class in train')
     parser.add_argument('--keep_template_look', type=bool, default=False, help='Use appearance features as a basis for classification so that the network retains appearance features')
     parser.add_argument('--test_track', default=False, action='store_true', help='test gmot with tracktor')
+    parser.add_argument('--test_track_att_vis', default=False, action='store_true', help='test gmot with tracktor and visualize the attention map')
     parser.add_argument('--test_ov', default=False, action='store_true', help='test ov coco')
     parser.add_argument('--dn_type', default='sample', help='you can chose dsn, dn and no dn')
     parser.add_argument('--number_template', default=2, type=int, help='number of template use in one image')
@@ -223,6 +226,13 @@ def main(args):
         model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu], find_unused_parameters=args.find_unused_params)
         model_without_ddp = model.module
     n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+    # from thop import profile
+    # input = torch.randn(1, 3, 800, 1200).cuda()
+    # template = [[torch.randn(3, 400, 400)]]
+    # flops, params = profile(model, (input, template))
+    # print('flops: %.2f M, params: %.2f M' % (flops / 1e6, params / 1e6))
+
     logger.info('number of params:'+str(n_parameters))
     logger.info("params:\n"+json.dumps({n: p.numel() for n, p in model.named_parameters() if p.requires_grad}, indent=2))
 
@@ -394,7 +404,7 @@ def main(args):
         print('every image cost {}s'.format((end - start)))
         return
     
-    if args.test_track:
+    if args.test_track or args.test_track_att_vis:
         # reid_model = Path('ckpts/osnet_ain_x1_0_msmt17.pth')
         # assert os.path.isfile(reid_model)
         # reid_network = FeatureExtractor(
@@ -405,7 +415,10 @@ def main(args):
 
         # tracker = Tracker(model, reid_network, args)
         tracker = Tracker(model, args)
-        dataset_test = build_dataset(image_set='test_track', args=args)
+        if args.test_track:
+            dataset_test = build_dataset(image_set='test_track', args=args)
+        else:
+            dataset_test = build_dataset(image_set='test_track_attention_visualization', args=args)
         # sampler_test = torch.utils.data.RandomSampler(dataset_test)
         # batch_sampler_test = torch.utils.data.BatchSampler(sampler_test, args.batch_size, drop_last=True)
         # data_loader_test = DataLoader(dataset_test, batch_sampler=batch_sampler_test,

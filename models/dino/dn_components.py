@@ -43,6 +43,7 @@ def prepare_for_sample_dn(dn_args, training, num_queries, hidden_dim, query_labe
         # positive and negative dn queries
         dn_number = dn_number * 2
         # limit dn_number < query_num/2
+        # import pdb; pdb.set_trace()
         targets_list = []
         for t in targets:
             if len(t['labels']) > num_queries/4:
@@ -208,7 +209,7 @@ def prepare_for_sample_dn(dn_args, training, num_queries, hidden_dim, query_labe
             'pad_size': pad_size,
             'num_dn_group': dn_number,
         }
-
+        # import pdb; pdb.set_trace()
         # recover target with multi-template
         # for t1, t2 in zip(targets_copy, targets):
         #     # print(t1.keys())
@@ -347,7 +348,7 @@ def prepare_for_cdn(dn_args, training, num_queries, num_classes, hidden_dim, lab
             else:
                 attn_mask[single_pad * 2 * i:single_pad * 2 * (i + 1), single_pad * 2 * (i + 1):pad_size] = True
                 attn_mask[single_pad * 2 * i:single_pad * 2 * (i + 1), :single_pad * 2 * i] = True
-        import ipdb; ipdb.set_trace()
+        # import pdb; ipdb.set_trace()
         dn_meta = {
             'pad_size': pad_size,
             'num_dn_group': dn_number,
