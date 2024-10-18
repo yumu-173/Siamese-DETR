@@ -12,12 +12,13 @@ echo "master addr: ${MASTER_ADDR}"
 echo "master port: ${MASTER_PORT}"
 
 coco_path='../dataset/COCO/'
-checkpoint='ckpts/checkpoint_swinb2.pth'
+checkpoint='ckpts/checkpoint_swinbft11.pth'
 python main.py \
     --coco_path $coco_path \
     --test \
-    --batch_size=16 \
+    --batch_size=1 \
     --resume $checkpoint \
     --config_file config/DINO/DINO_4scale_swin.py \
+    --output_dir logs/DINO/urban_track \
+    --number_template 1 \
     # --dn_type no \
-    --output_dir logs/DINO/R50-MS4-1

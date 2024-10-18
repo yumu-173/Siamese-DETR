@@ -24,7 +24,7 @@ python -m torch.distributed.run --nproc_per_node=${GPUS} \
     main.py \
     --coco_path $coco_path \
     --rank ${RANK} \
-    --config_file config/DINO/DINO_4scale_swint.py \
+    --config_file config/Siamese_DETR/Siamese_DETR_swint.py \
     --n_nodes ${NODE_COUNT} \
     --batch_size=1 \
     --output_dir $out_put_dir \
