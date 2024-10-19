@@ -84,7 +84,7 @@ Dataset/
 
 ## Template
 
-We randomly detect objects in the first frame of each sequence in GMOT as the template. The specific code for obtaining the template can be found in datasets/coco.py from line 761 to 793. The template used in our paper is as follows.
+We randomly choose objects in the first frame of each sequence in GMOT as the template. The specific code for obtaining the template can be found in datasets/coco.py from line 761 to 793. We have uploaded some [templates](template) for running. The template used in our paper is as follows. 
 ![Template](image/template.png)
 
 ## Model
