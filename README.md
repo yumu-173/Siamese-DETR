@@ -1,5 +1,7 @@
 # Siamese-DETR
 
+This is the official implementation of the paper [Siamese-DETR for Generic Multi-Object Tracking](https://ieeexplore.ieee.org/abstract/document/10571840/)
+
 ## Abstract
 
 The ability to detect and track the dynamic objects in different scenes is fundamental to real-world applications, e.g., autonomous driving and robot navigation. However, traditional Multi-Object Tracking (MOT) is limited to tracking objects belonging to the pre-defined closed-set categories. Recently, Open-Vocabulary MOT (OVMOT) and Generic MOT (GMOT) are proposed to track interested objects beyond pre-defined categories with the given text prompt and template image. However, the expensive well pre-trained (vision-)language model and fine-grained category annotations are required to train OVMOT models. In this paper, we focus on GMOT and propose a simple but effective method, Siamese-DETR, for GMOT. Only the commonly used detection datasets (e.g., COCO) are required for training. Different from existing GMOT methods, which train a Single Object Tracking (SOT) based detector to detect interested objects and then apply a data association based MOT tracker to get the trajectories, we leverage the inherent object queries in DETR variants. Specifically: 1) The multi-scale object queries are designed based on the given template image, which are effective for detecting different scales of objects with the same category as the template image; 2) A dynamic matching training strategy is introduced to train Siamese-DETR on commonly used detection datasets, which takes full advantage of provided annotations; 3) The online tracking pipeline is simplified through a tracking-byquery manner by incorporating the tracked boxes in previous frame as additional query boxes. The complex data association is replaced with the much simpler Non-Maximum Suppression (NMS). Extensive experimental results show that Siamese-DETR surpasses existing MOT methods on GMOT-40 dataset by a large margin.
@@ -14,11 +16,11 @@ The ability to detect and track the dynamic objects in different scenes is funda
   <summary>Installation</summary>
   
   We use the environment same to DINO to run Siamese-DETR. 
-  We test our models under ```python=3.9.16, pytorch=1.13.1,cuda=11.7```. Other versions might be available as well. 
+  We test our models under ```python=3.9.16, pytorch=1.13.1, cuda=11.7```. Other versions might be available as well. 
 
    1. Clone this repo
    ```sh
-   https://github.com/yumu-173/gmot.git
+   https://github.com/yumu-173/Siamese-DETR.git
    ```
 
    2. Install other needed packages
@@ -41,6 +43,7 @@ The ability to detect and track the dynamic objects in different scenes is funda
 <html>
   <summary>Data</summary>
 
+[Swin Transformer](https://github.com/microsoft/Swin-Transformer) are used as backbone for Siamese-DETR.
 Please download [COCO 2017](https://cocodataset.org/), [object365](https://www.objects365.org/overview.html), [GMOT-40](https://spritea.github.io/GMOT40/) dataset and organize them as following:
 ```
 Dataset/
@@ -56,6 +59,9 @@ Dataset/
       ├── airplane-0
       ├── ...
     ├── anno
+  ├── backbone/
+    ├── swin_tiny_patch4_window7_224.pth
+    ├── ...
 ```
 </html>
 
@@ -75,6 +81,16 @@ Dataset/
   ```sh
   bash scripts/Siamese_DETR_test_track.sh
   ```
+
+## Model
+
+| Model                            | Dataset      | AP    | AP<sub>50  | AP<sub>75  | AP<sub>S   | AP<sub>M   | AP<sub>L    | Checkpoint |
+|----------------------------------|--------------|-------|-------|-------|-------|-------|--------|---------|
+| Siamese-DETR (Ours, Swin-T)      | COCO [42]    | 57.5% | 46.6% | 35.9% | 42.8% | 504   | 666    | [Baidu](https://pan.baidu.com/s/1Mv7WyUlrHbFrjrc_lCzyxA?pwd=9iwb)   |
+|                                  | Objects365 [46] | 59.3% | 48.0% | 40.8% | 44.2% | 668   | 519    | [Baidu](https://pan.baidu.com/s/1RvdJRmrYaYM_izbFyZvHNw?pwd=ekhr)   |
+| Siamese-DETR (Ours, Swin-B)      | COCO [42]    | 65.6% | 50.6% | 43.1% | 46.6% | 681   | 466    | -   |
+|                                  | Objects365 [46] | 69.6% | 55.4% | 50.0% | 51.3% | 1083  | 278    | -   |
+
 
 ## Bibcite
 
