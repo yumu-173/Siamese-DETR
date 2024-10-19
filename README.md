@@ -82,6 +82,11 @@ Dataset/
   bash scripts/Siamese_DETR_test_track.sh
   ```
 
+## Template
+
+We randomly detect objects in the first frame of each sequence in GMOT as the template. The specific code for obtaining the template can be found in datasets/coco.py from line 761 to 793. The template used in our paper is as follows.
+![Template](image/template.png)
+
 ## Model
 
 | Model                            | Dataset      | AP    | AP<sub>50  | AP<sub>75  | AP<sub>S   | AP<sub>M   | AP<sub>L    | Checkpoint |

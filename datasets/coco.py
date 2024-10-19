@@ -33,7 +33,7 @@ from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 Image.MAX_IMAGE_PIXELS = None
 
-from .gmot_wrapper import GMOT40Wrapper
+from .gmot_wrapper import GMOT40Wrapper, GMOT40VisualizeAttentionWrapper
 
 __all__ = ['build']
 
@@ -770,10 +770,11 @@ class CocoDetection(torchvision.datasets.CocoDetection):
                     # template = Image.open('template/gmot2/' + key +'.jpg')
                     
                     # template group 3
-                    template = Image.open('template/gmot3/' + key +'.jpg')
+                    # template = Image.open('template/gmot3/' + key +'.jpg')
 
                     # template group track
-                    # template = Image.open('template/gmot_track/' + key +'.jpg')
+                    template = Image.open('template/gmot_track/' + key +'.jpg')
+                    # import pdb; pdb.set_trace()
 
                     # save template id
                     # with open('template/group3.txt', 'a') as f:
@@ -1443,10 +1444,17 @@ def build(image_set, args):
     mode = 'instances'
     gmot_root = '../gmot-main/data/COCO/'
     gmot_root = Path(gmot_root)
+    ut_root = 'Dataset/Urban_Track/'
+    ut_root = Path(ut_root)
     panda_root = '../dataset/panda/'
     panda_root = Path(panda_root)
     ov_root = 'ov_data/'
     ov_root = Path(ov_root)
+
+    # gmot attention visualization
+    gmot_attention_vis_root = 'template/gmot_attention_visualization'
+    gmot_attention_vis_root = Path(gmot_root)
+
     if args.train_with_coco_lasot_got:
         lasot_got_coco_root = args.coco_lasot_got_path
         lasot_got_coco_root = Path(lasot_got_coco_root)
@@ -1462,7 +1470,10 @@ def build(image_set, args):
         "train_adj": (root, root / "annotations" / f'fsc_adj.json'),
         "train_gmot":(gmot_root, gmot_root / 'annotations' / 'gmot_test.json'),
         "test":(gmot_root, gmot_root / 'annotations' / 'gmot_test.json'),
+        # "test":(ut_root, ut_root / 'annotations' / 'urban_track_det_gt.json'),
         "test_track":(gmot_root, gmot_root / 'annotations' / 'gmot_test.json'),
+        # "test_track":(ut_root, ut_root / 'annotations' / 'urban_track_det_gt.json'),
+        "test_track_attention_visualization": (gmot_attention_vis_root, gmot_attention_vis_root / 'annotations' / 'gmot_test.json'),
         # "test_ov":(root / 'train2017', root / "annotations" / f'{mode}_train2017.json'),
         "test_ov": (root / 'val2017', root / "annotations" / f'{mode}_val2017.json'),
         "train_reg": (root / "train2017", root / "annotations" / f'{mode}_train2017.json'),
@@ -1503,6 +1514,8 @@ def build(image_set, args):
     if image_set == 'test_track':
         dataset = GMOT40Wrapper()
         # import pdb; pdb.set_trace()
+    elif image_set == 'test_track_attention_visualization':
+        dataset = GMOT40VisualizeAttentionWrapper()
     elif image_set == 'test_ov':
         dataset = CocoDetection(img_folder, ann_file,
                 transforms=make_coco_transforms(image_set, fix_size=args.fix_size, strong_aug=strong_aug, args=args), 
@@ -1524,7 +1537,7 @@ def build(image_set, args):
     if image_set in ['test', 'test_mot17']:
         dataset.get_sequence_id_to_img_id()
         # print(dataset.class_dict)
-    elif image_set == 'test_track':
+    elif image_set in ['test_track', 'test_track_attention_visualization']:
         pass
     elif image_set == 'train':
         dataset.get_class_id_to_img_id()
