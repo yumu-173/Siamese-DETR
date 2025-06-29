@@ -105,6 +105,9 @@ We randomly choose objects in the first frame of each sequence in GMOT as the te
   author={Liu, Qiankun and Li, Yichen and Jiang, Yuqi and Fu, Ying},
   journal={IEEE Transactions on Image Processing},
   year={2024},
-  publisher={IEEE}
+  publisher={IEEE},
+  volume={33},
+  pages={3935 - 3949},
+  doi={10.1109/TIP.2024.3416880}
 }
 ```
